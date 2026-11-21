@@ -373,13 +373,105 @@ describe("@memeagotchi/server HTTP + SQLite integration", () => {
 
     // 6. Online Leaderboard ranks Alice above Bob
     const lbRes = await fetch(`${base}/api/leaderboard`, { headers: { cookie: cookieA } });
-    const lb = (await lbRes.json()) as { ok: boolean; entries: Array<{ handle: string; petName: string; xp: number }> };
+    const lb = (await lbRes.json()) as {
+      ok: boolean;
+      entries: Array<{ userId: string; handle: string; petName: string; xp: number }>;
+    };
     assert.equal(lb.ok, true);
     assert.equal(lb.entries.length, 2);
     assert.equal(lb.entries[0]!.handle, "@alice");
     assert.equal(lb.entries[0]!.petName, "Blaze");
+    const aliceId = lb.entries[0]!.userId;
+    const bobId = lb.entries[1]!.userId;
 
-    // 7. Revoking paired device invalidates its Bearer token immediately (401)
+    // 7. Cloud-Synced Ember Vale RPG Saves (Web Companion PUT -> Paired Handheld GET via Bearer!)
+    const putEmber = await fetch(`${base}/api/ember-save`, {
+      method: "PUT",
+      headers: { cookie: cookieA, "content-type": "application/json" },
+      body: JSON.stringify({
+        files: {
+          "wallet.json": Buffer.from(JSON.stringify({ coins: 42, lifetime_coins: 120, version: 1 })).toString("base64"),
+          "status.json": Buffer.from(JSON.stringify({ game: "ember_vale", hearts: 5, crystals: 1 })).toString("base64"),
+          "evil.exe": "blocked",
+        },
+      }),
+    });
+    assert.equal(putEmber.status, 200);
+
+    const getEmberHw = await fetch(`${base}/api/ember-save`, {
+      headers: { authorization: `Bearer ${claimData.deviceToken}` },
+    });
+    assert.equal(getEmberHw.status, 200);
+    const emberSaved = (await getEmberHw.json()) as { ok: boolean; files: Record<string, string> };
+    assert.equal(emberSaved.ok, true);
+    assert.ok(emberSaved.files["wallet.json"]);
+    assert.ok(emberSaved.files["status.json"]);
+    assert.equal(emberSaved.files["evil.exe"], undefined); // strict filename whitelist!
+
+    // 8. Social Visits: Bob visits Alice's profile, cheers her pet, and gifts a meme
+    const profRes = await fetch(`${base}/api/players/${encodeURIComponent(aliceId)}`, {
+      headers: { cookie: cookieB },
+    });
+    assert.equal(profRes.status, 200);
+    const prof = (await profRes.json()) as {
+      ok: boolean;
+      profile: { petName: string; cheerCount: number; cheeredTodayByViewer: boolean; isSelf: boolean };
+    };
+    assert.equal(prof.ok, true);
+    assert.equal(prof.profile.petName, "Blaze");
+    assert.equal(prof.profile.isSelf, false);
+    assert.equal(prof.profile.cheeredTodayByViewer, false);
+
+    // Bob cheers Alice once -> succeeds; second same-day cheer -> 400!
+    const cheer1 = await fetch(`${base}/api/players/${encodeURIComponent(aliceId)}/cheer`, {
+      method: "POST",
+      headers: { cookie: cookieB, "content-type": "application/json" },
+      body: "{}",
+    });
+    assert.equal(cheer1.status, 200);
+    const cheerDup = await fetch(`${base}/api/players/${encodeURIComponent(aliceId)}/cheer`, {
+      method: "POST",
+      headers: { cookie: cookieB, "content-type": "application/json" },
+      body: "{}",
+    });
+    assert.equal(cheerDup.status, 400);
+
+    // Bob gifts a meme to Alice (profanity note blocked; clean note succeeds)
+    const bobState = await callRpc({ cookie: cookieB }, "getState");
+    const firstMemeId = bobState.body.result.view.memes[0].id as number;
+    const badGift = await fetch(`${base}/api/players/${encodeURIComponent(aliceId)}/gift-meme`, {
+      method: "POST",
+      headers: { cookie: cookieB, "content-type": "application/json" },
+      body: JSON.stringify({ memeId: firstMemeId, note: "fuck this" }),
+    });
+    assert.equal(badGift.status, 400);
+
+    const goodGift = await fetch(`${base}/api/players/${encodeURIComponent(aliceId)}/gift-meme`, {
+      method: "POST",
+      headers: { cookie: cookieB, "content-type": "application/json" },
+      body: JSON.stringify({ memeId: firstMemeId, note: "Fresh meme delivery!" }),
+    });
+    assert.equal(goodGift.status, 200);
+
+    // Profile now reflects 1 cheer + 2 recent visits (gift + cheer), and self-cheer is rejected
+    const profAfterRes = await fetch(`${base}/api/players/${encodeURIComponent(aliceId)}`, {
+      headers: { cookie: cookieB },
+    });
+    const profAfter = (await profAfterRes.json()) as {
+      profile: { cheerCount: number; cheeredTodayByViewer: boolean; recentVisits: Array<{ kind: string }> };
+    };
+    assert.equal(profAfter.profile.cheerCount, 1);
+    assert.equal(profAfter.profile.cheeredTodayByViewer, true);
+    assert.equal(profAfter.profile.recentVisits.length, 2);
+
+    const selfCheer = await fetch(`${base}/api/players/${encodeURIComponent(bobId)}/cheer`, {
+      method: "POST",
+      headers: { cookie: cookieB, "content-type": "application/json" },
+      body: "{}",
+    });
+    assert.equal(selfCheer.status, 400);
+
+    // 9. Revoking paired device invalidates its Bearer token immediately (401)
     const revRes = await fetch(`${base}/api/devices/${claimData.deviceId}`, {
       method: "DELETE",
       headers: { cookie: cookieA },

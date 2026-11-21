@@ -4,6 +4,101 @@ const FILE_NAMES = ["save.dat", "wallet.json", "status.json"] as const;
 const memoryFallback: Record<string, string> = {};
 const listeners = new Set<() => void>();
 
+export interface EmberCloudSyncAdapter {
+  push: (files: Record<string, string>) => Promise<void>;
+  clear: () => Promise<void>;
+}
+
+let cloudAdapter: EmberCloudSyncAdapter | null = null;
+let pushTimer: ReturnType<typeof setTimeout> | null = null;
+let cloudSyncStatus: "local" | "syncing" | "synced" | "error" = "local";
+
+export function getEmberCloudStatus(): "local" | "syncing" | "synced" | "error" {
+  return cloudSyncStatus;
+}
+
+export function configureEmberCloudSync(adapter: EmberCloudSyncAdapter | null): void {
+  cloudAdapter = adapter;
+  if (!adapter) {
+    cloudSyncStatus = "local";
+    notify();
+  }
+}
+
+function scheduleCloudPush(): void {
+  if (!cloudAdapter) return;
+  if (pushTimer) clearTimeout(pushTimer);
+  cloudSyncStatus = "syncing";
+  notify();
+  pushTimer = setTimeout(() => {
+    pushTimer = null;
+    if (!cloudAdapter) return;
+    const files = exportEmberFilesBase64();
+    void cloudAdapter
+      .push(files)
+      .then(() => {
+        cloudSyncStatus = "synced";
+        notify();
+      })
+      .catch(() => {
+        cloudSyncStatus = "error";
+        notify();
+      });
+  }, 350);
+}
+
+export function exportEmberFilesBase64(): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const name of FILE_NAMES) {
+    const raw = lsGet(STORAGE_PREFIX + name);
+    if (raw != null) out[name] = raw;
+  }
+  return out;
+}
+
+export function importEmberFilesBase64(files: Record<string, string>, replace = true): void {
+  if (replace) {
+    for (const name of FILE_NAMES) {
+      if (!(name in files)) lsDel(STORAGE_PREFIX + name);
+    }
+  }
+  for (const name of FILE_NAMES) {
+    const val = files[name];
+    if (typeof val === "string" && val.length > 0) {
+      lsSet(STORAGE_PREFIX + name, val);
+    }
+  }
+  cloudSyncStatus = "synced";
+  notify();
+}
+
+export async function hydrateEmberFromCloud(
+  fetchCloud: () => Promise<{ files: Record<string, string>; updatedAt: number | null }>,
+): Promise<boolean> {
+  try {
+    cloudSyncStatus = "syncing";
+    notify();
+    const remote = await fetchCloud();
+    const hasRemote = Object.keys(remote.files).length > 0;
+    if (hasRemote) {
+      importEmberFilesBase64(remote.files, true);
+      return true;
+    }
+    // If cloud is empty but this browser already has a local Ember Vale save, seed the cloud!
+    const local = exportEmberFilesBase64();
+    if (Object.keys(local).length > 0 && cloudAdapter) {
+      await cloudAdapter.push(local);
+    }
+    cloudSyncStatus = "synced";
+    notify();
+    return false;
+  } catch {
+    cloudSyncStatus = "error";
+    notify();
+    return false;
+  }
+}
+
 function notify(): void {
   for (const fn of listeners) {
     try {
@@ -71,6 +166,7 @@ export function readEmberFile(name: string): Uint8Array | null {
 export function writeEmberFile(name: string, u8: Uint8Array): number {
   lsSet(STORAGE_PREFIX + name, toBase64(u8));
   notify();
+  scheduleCloudPush();
   return 0;
 }
 
@@ -204,8 +300,25 @@ export function cashOutEmberWallet(): { cashedCoins: number; score: number; maxC
 }
 
 export function eraseEmberSave(): void {
+  if (pushTimer) {
+    clearTimeout(pushTimer);
+    pushTimer = null;
+  }
   for (const name of FILE_NAMES) {
     lsDel(STORAGE_PREFIX + name);
+  }
+  if (cloudAdapter) {
+    cloudSyncStatus = "syncing";
+    void cloudAdapter
+      .clear()
+      .then(() => {
+        cloudSyncStatus = "synced";
+        notify();
+      })
+      .catch(() => {
+        cloudSyncStatus = "error";
+        notify();
+      });
   }
   notify();
 }

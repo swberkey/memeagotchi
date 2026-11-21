@@ -103,7 +103,7 @@ function buildSecurityHeaders(corsOrigin?: string): Record<string, string> {
     h["access-control-allow-origin"] = corsOrigin;
     h["access-control-allow-credentials"] = "true";
     h["access-control-allow-headers"] = "content-type, authorization";
-    h["access-control-allow-methods"] = "GET, POST, DELETE, OPTIONS";
+    h["access-control-allow-methods"] = "GET, POST, PUT, DELETE, OPTIONS";
   }
   return h;
 }
@@ -470,6 +470,88 @@ export function createAppServer(options: AppServerOptions) {
           baseHeaders,
         );
         return;
+      }
+
+      /* ==================== Cloud-Synced Ember Vale RPG Saves ==================== */
+
+      if (req.method === "GET" && pathname === "/api/ember-save") {
+        const actor = resolveActor(req, url);
+        const saved = repo.getEmberSave(actor.userId);
+        sendJson(res, 200, { ok: true, ...saved }, baseHeaders);
+        return;
+      }
+
+      if (req.method === "PUT" && pathname === "/api/ember-save") {
+        if (!checkRateLimit(ip, "ember", 120)) {
+          throw new RpcError(429, "Too many save sync requests. Slow down a bit.");
+        }
+        const actor = resolveActor(req, url);
+        const body = await readJsonBody<{ files?: Record<string, unknown> }>(req, 96 * 1024);
+        if (!body.files || typeof body.files !== "object") {
+          throw new RpcError(400, "Missing files map.");
+        }
+        const t = now();
+        const saved = repo.putEmberSave(actor.userId, body.files, t);
+        broadcastToUser(actor.userId, "ember_save_updated", { updatedAt: t });
+        sendJson(res, 200, { ok: true, ...saved }, baseHeaders);
+        return;
+      }
+
+      if (req.method === "DELETE" && pathname === "/api/ember-save") {
+        const actor = resolveActor(req, url);
+        repo.deleteEmberSave(actor.userId);
+        broadcastToUser(actor.userId, "ember_save_updated", { updatedAt: now(), cleared: true });
+        sendJson(res, 200, { ok: true }, baseHeaders);
+        return;
+      }
+
+      /* ==================== Social Visits: Friend Profile, Cheer & Meme Gifts ==================== */
+
+      if (pathname.startsWith("/api/players/")) {
+        const parts = pathname.slice("/api/players/".length).split("/").filter(Boolean);
+        const targetUserId = parts[0] ? decodeURIComponent(parts[0]) : "";
+        const subAction = parts[1] ?? "";
+
+        if (req.method === "GET" && targetUserId && !subAction) {
+          const actor = resolveActor(req, url);
+          const profile = repo.getPlayerProfile(targetUserId, actor.userId, now());
+          if (!profile) throw new RpcError(404, "Trainer profile not found.");
+          sendJson(res, 200, { ok: true, profile }, baseHeaders);
+          return;
+        }
+
+        if (req.method === "POST" && targetUserId && subAction === "cheer") {
+          if (!checkRateLimit(ip, "social", 60)) {
+            throw new RpcError(429, "Too many social visits. Try again in a moment.");
+          }
+          const actor = resolveActor(req, url);
+          const t = now();
+          const result = repo.cheerPlayer(actor.userId, targetUserId, t);
+          if (!result.ok) throw new RpcError(400, result.message);
+          broadcastToUser(targetUserId, "state_updated", { action: "social_cheer", at: t });
+          broadcastToUser(actor.userId, "state_updated", { action: "social_cheer", at: t });
+          sendJson(res, 200, result, baseHeaders);
+          return;
+        }
+
+        if (req.method === "POST" && targetUserId && subAction === "gift-meme") {
+          if (!checkRateLimit(ip, "social", 60)) {
+            throw new RpcError(429, "Too many gift requests. Try again in a moment.");
+          }
+          const actor = resolveActor(req, url);
+          const body = await readJsonBody<{ memeId?: number; note?: string }>(req);
+          const memeId = Number(body.memeId);
+          if (!Number.isInteger(memeId) || memeId <= 0) {
+            throw new RpcError(400, "Please choose a valid meme to gift.");
+          }
+          const t = now();
+          const result = repo.giftMemeToPlayer(actor.userId, targetUserId, memeId, String(body.note ?? ""), t);
+          if (!result.ok) throw new RpcError(400, result.message);
+          broadcastToUser(targetUserId, "state_updated", { action: "social_gift", at: t });
+          broadcastToUser(actor.userId, "state_updated", { action: "social_gift", at: t });
+          sendJson(res, 200, result, baseHeaders);
+          return;
+        }
       }
 
       /* ==================== Real-Time SSE Live Sync Stream ==================== */

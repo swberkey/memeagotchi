@@ -1,3 +1,4 @@
+import type { GameView } from "@memeagotchi/game-core";
 import { MemeMonster } from "@memeagotchi/monster-ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
@@ -5,12 +6,16 @@ import {
   authLogin,
   authLogout,
   authRegister,
+  cheerPlayer,
   createDevicePairCode,
   fetchAuthMe,
   fetchLeaderboard,
+  fetchPlayerProfile,
+  giftMemeToPlayer,
   revokePairedDevice,
   type LeaderboardEntry,
 } from "../api";
+import { resolveMemeImage } from "../memeImages";
 
 type HubTab = "account" | "pair" | "leaderboard";
 type BoardMetric = "xp" | "streak" | "runner" | "blaster" | "beat" | "ember";
@@ -30,10 +35,12 @@ function metricLabel(e: LeaderboardEntry, m: BoardMetric): string {
 
 export function OnlineHubModal({
   liveConnected,
+  myMemes = [],
   onClose,
   onNotify,
 }: {
   liveConnected: boolean;
+  myMemes?: GameView["memes"];
   onClose: () => void;
   onNotify: (msg: string) => void;
 }) {
@@ -47,6 +54,9 @@ export function OnlineHubModal({
 
   const [pairCode, setPairCode] = useState<{ code: string; expiresAt: number } | null>(null);
   const [metric, setMetric] = useState<BoardMetric>("xp");
+  const [visitingUserId, setVisitingUserId] = useState<string | null>(null);
+  const [giftMemeId, setGiftMemeId] = useState<number>(() => myMemes[0]?.id ?? 0);
+  const [giftNote, setGiftNote] = useState("");
 
   const authQuery = useQuery({
     queryKey: ["authMe"],
@@ -59,10 +69,19 @@ export function OnlineHubModal({
     enabled: hubTab === "leaderboard",
   });
 
+  const profileQuery = useQuery({
+    queryKey: ["playerProfile", visitingUserId],
+    queryFn: () => fetchPlayerProfile(visitingUserId!),
+    enabled: hubTab === "leaderboard" && Boolean(visitingUserId),
+  });
+
   const refreshAll = () => {
     void qc.invalidateQueries({ queryKey: ["authMe"] });
     void qc.invalidateQueries({ queryKey: ["gameState"] });
     void qc.invalidateQueries({ queryKey: ["leaderboard"] });
+    if (visitingUserId) {
+      void qc.invalidateQueries({ queryKey: ["playerProfile", visitingUserId] });
+    }
   };
 
   const registerMut = useMutation({
@@ -113,12 +132,35 @@ export function OnlineHubModal({
     },
   });
 
+  const cheerMut = useMutation({
+    mutationFn: (uid: string) => cheerPlayer(uid),
+    onSuccess: (r) => {
+      refreshAll();
+      onNotify(r.message);
+    },
+    onError: (e: Error) => onNotify(`⚠️ ${e.message}`),
+  });
+
+  const giftMut = useMutation({
+    mutationFn: ({ uid, memeId, note }: { uid: string; memeId: number; note: string }) =>
+      giftMemeToPlayer(uid, { memeId, note }),
+    onSuccess: (r) => {
+      setGiftNote("");
+      refreshAll();
+      onNotify(r.message);
+    },
+    onError: (e: Error) => onNotify(`⚠️ ${e.message}`),
+  });
+
   const user = authQuery.data?.actor.user ?? null;
   const pairedDevices = authQuery.data?.pairedDevices ?? [];
 
   const sortedBoard = [...(lbQuery.data?.entries ?? [])].sort(
     (a, b) => metricValue(b, metric) - metricValue(a, metric) || b.xp - a.xp,
   );
+
+  const visited = profileQuery.data?.profile ?? null;
+  const effectiveGiftId = myMemes.some((m) => m.id === giftMemeId) ? giftMemeId : (myMemes[0]?.id ?? 0);
 
   return (
     <div
@@ -146,7 +188,7 @@ export function OnlineHubModal({
               </span>
             </div>
             <p className="text-xs text-[var(--dim)] mt-0.5">
-              Cloud accounts, 320×240 handheld pairing &amp; live global rankings.
+              Cloud accounts, Ember Vale cloud saves, handheld pairing &amp; friend visits.
             </p>
           </div>
           <button
@@ -164,13 +206,16 @@ export function OnlineHubModal({
             [
               ["account", user ? `👤 @${user.handle}` : "👤 Account"],
               ["pair", `📟 Pair (${pairedDevices.length})`],
-              ["leaderboard", "🏆 Rankings"],
+              ["leaderboard", "🏆 Rankings & Visit"],
             ] as const
           ).map(([id, lbl]) => (
             <button
               key={id}
               type="button"
-              onClick={() => setHubTab(id)}
+              onClick={() => {
+                setHubTab(id);
+                if (id !== "leaderboard") setVisitingUserId(null);
+              }}
               className={`py-2 rounded-xl text-xs font-bold truncate px-2 transition-all ${
                 hubTab === id
                   ? "bg-[var(--accent)] text-[#141026] shadow"
@@ -197,7 +242,7 @@ export function OnlineHubModal({
                   </span>
                 </div>
                 <p className="text-xs text-[var(--dim)]">
-                  Your pet save, Drip wardrobe, fed meme dreams, and SNES high scores are tied to <b>@{user.handle}</b> and sync live to any paired 320×240 handheld!
+                  Your pet save, Drip wardrobe, fed meme dreams, SNES high scores, and <b>Ember Vale RPG saves</b> sync automatically to <b>@{user.handle}</b> across phone, desktop, and paired 320×240 handhelds!
                 </p>
                 <div className="flex gap-2">
                   <button
@@ -294,7 +339,7 @@ export function OnlineHubModal({
                   </button>
                 </form>
                 <p className="text-[11px] text-[var(--dim)] text-center">
-                  Currently playing as <b>Local Guest</b>. Creating an account isolates your pet save &amp; puts you on the live Leaderboard.
+                  Currently playing as <b>Local Guest</b>. Creating an account isolates your pet &amp; Ember Vale saves and puts you on the live Leaderboard.
                 </p>
               </div>
             )}
@@ -381,71 +426,272 @@ export function OnlineHubModal({
           </div>
         )}
 
-        {/* TAB 3: GLOBAL LEADERBOARD */}
+        {/* TAB 3: GLOBAL LEADERBOARD + FRIEND HABITAT VISIT / CHEER / MEME GIFT */}
         {hubTab === "leaderboard" && (
           <div className="space-y-3">
-            <div className="flex flex-wrap gap-1.5">
-              {(
-                [
-                  ["xp", "⭐ XP"],
-                  ["streak", "🔥 Streak"],
-                  ["runner", "🏃 Runner"],
-                  ["blaster", "💥 Blaster"],
-                  ["beat", "🎵 Vibe Beat"],
-                  ["ember", "⚔️ Ember Vale"],
-                ] as const
-              ).map(([mId, lbl]) => (
+            {visitingUserId ? (
+              <div className="space-y-3">
                 <button
-                  key={mId}
                   type="button"
-                  onClick={() => setMetric(mId)}
-                  className={`rounded-full px-2.5 py-1 text-[11px] font-bold border ${
-                    metric === mId
-                      ? "border-[var(--accent)] bg-[var(--accent)] text-[#141026]"
-                      : "border-white/12 bg-white/5 text-[var(--dim)]"
-                  }`}
+                  onClick={() => setVisitingUserId(null)}
+                  className="rounded-full border border-white/15 bg-white/8 px-3 py-1 text-xs font-bold text-[#7be6d8] hover:bg-white/15"
                 >
-                  {lbl}
+                  ← Back to Global Rankings
                 </button>
-              ))}
-            </div>
 
-            {lbQuery.isPending ? (
-              <p className="text-center text-xs text-[var(--dim)] py-6">Loading rankings…</p>
-            ) : sortedBoard.length === 0 ? (
-              <p className="text-center text-xs text-[var(--dim)] py-6">Hatch a starter pet to join the rankings!</p>
+                {profileQuery.isPending ? (
+                  <p className="text-center text-xs text-[var(--dim)] py-8">Visiting trainer habitat…</p>
+                ) : !visited ? (
+                  <p className="text-center text-xs text-rose-300 py-8">Could not load this trainer&apos;s pet.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {/* Visited Monster Card */}
+                    <div className="rounded-2xl border border-[var(--accent)]/40 bg-gradient-to-b from-[#1e1846] to-[#120e29] p-4 space-y-3">
+                      <div className="flex items-center gap-3.5">
+                        <div className="w-24 h-24 shrink-0 rounded-2xl bg-black/30 border border-white/10 p-1.5">
+                          <MemeMonster
+                            species={visited.species}
+                            displayStage={visited.displayStage}
+                            actualStage={visited.stage}
+                            mood={visited.mood}
+                            equipped={visited.equippedItems}
+                          />
+                        </div>
+                        <div className="min-w-0 flex-1 space-y-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className="font-pixel text-base text-white truncate">{visited.petName}</p>
+                            <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-bold text-[#7be6d8]">
+                              {visited.handle}
+                            </span>
+                          </div>
+                          <p className="text-xs text-[var(--dim)]">
+                            Stage {visited.stage} {visited.stageName} · 🔥 {visited.careStreak}d Streak · 🤝 {visited.cheerCount} Cheers
+                          </p>
+                          <p className="font-mono text-xs font-bold text-[#fde047]">
+                            ⭐ {visited.xp.toLocaleString()} XP · 💧 {visited.drip} Drip · 🍽️ {visited.digestedCount} Digested
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* 4 SNES Arcade High Scores */}
+                      <div className="grid grid-cols-4 gap-1.5 text-center">
+                        {(
+                          [
+                            ["🏃", "Runner", visited.highScores.runner.bestScore],
+                            ["💥", "Blaster", visited.highScores.blaster.bestScore],
+                            ["🎵", "Beat", visited.highScores.beat.bestScore],
+                            ["⚔️", "Ember", visited.highScores.ember.bestScore],
+                          ] as const
+                        ).map(([glyph, lbl, score]) => (
+                          <div key={lbl} className="rounded-xl border border-white/10 bg-black/25 py-1.5 px-1">
+                            <p className="text-[10px] text-[var(--dim)]">{glyph} {lbl}</p>
+                            <p className="font-mono text-xs font-extrabold text-white">{score}</p>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Dream Memes Showcase */}
+                      {visited.dreamMemes.length > 0 && (
+                        <div>
+                          <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--dim)] mb-1.5">
+                            💭 {visited.petName}&apos;s Recent Fed Memes
+                          </p>
+                          <div className="flex gap-1.5 overflow-x-auto pb-1">
+                            {visited.dreamMemes.map((dm, idx) => {
+                              const src = resolveMemeImage({ imageUrl: dm.imageUrl, imageKey: dm.imageKey ?? dm.memeKey });
+                              return (
+                                <div
+                                  key={`${dm.memeKey}-${idx}`}
+                                  title={dm.title}
+                                  className="h-12 w-16 shrink-0 overflow-hidden rounded-lg border border-white/15 bg-black/40 flex items-center justify-center"
+                                >
+                                  {src ? (
+                                    <img src={src} alt={dm.title} className="h-full w-full object-contain" />
+                                  ) : (
+                                    <span className="text-xl">{dm.emoji}</span>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Cheer & Gift Actions (for visiting friends) */}
+                      {!visited.isSelf ? (
+                        <div className="space-y-2.5 pt-1 border-t border-white/10">
+                          <button
+                            type="button"
+                            disabled={visited.cheeredTodayByViewer || cheerMut.isPending}
+                            onClick={() => cheerMut.mutate(visited.userId)}
+                            className="w-full rounded-xl bg-gradient-to-r from-[#7be6d8] to-[#fde047] py-2 text-xs font-extrabold text-[#141026] disabled:opacity-45"
+                          >
+                            {visited.cheeredTodayByViewer
+                              ? "✓ Already Cheered Today! Come Back Tomorrow"
+                              : cheerMut.isPending
+                                ? "Sending Cheer…"
+                                : `🤝 Cheer ${visited.petName} (+8 Happy for Them · +5 Drip for You!)`}
+                          </button>
+
+                          {myMemes.length > 0 && (
+                            <form
+                              className="rounded-xl border border-white/10 bg-black/25 p-2.5 space-y-2"
+                              onSubmit={(e) => {
+                                e.preventDefault();
+                                if (!effectiveGiftId) return;
+                                giftMut.mutate({ uid: visited.userId, memeId: effectiveGiftId, note: giftNote });
+                              }}
+                            >
+                              <p className="text-[11px] font-bold text-[#c4b5fd]">
+                                🎁 Gift a Meme (+20 XP &amp; +6 Drip for {visited.petName}, +6 Drip for you)
+                              </p>
+                              <select
+                                aria-label="Select meme to gift"
+                                value={effectiveGiftId}
+                                onChange={(e) => setGiftMemeId(Number(e.target.value))}
+                                className="w-full rounded-lg border border-white/15 bg-[#120e29] px-2.5 py-1.5 text-xs text-white"
+                              >
+                                {myMemes.slice(0, 20).map((mm) => (
+                                  <option key={mm.id} value={mm.id}>
+                                    {mm.emoji} {mm.title}
+                                  </option>
+                                ))}
+                              </select>
+                              <div className="flex gap-1.5">
+                                <input
+                                  aria-label="Optional gift message"
+                                  value={giftNote}
+                                  onChange={(e) => setGiftNote(e.target.value)}
+                                  maxLength={60}
+                                  placeholder="Optional note (e.g. Fresh meme delivery!)"
+                                  className="flex-1 rounded-lg border border-white/15 bg-[#120e29] px-2.5 py-1.5 text-xs text-white"
+                                />
+                                <button
+                                  type="submit"
+                                  disabled={giftMut.isPending || !effectiveGiftId}
+                                  className="rounded-lg bg-[#c4b5fd] px-3 py-1.5 text-xs font-extrabold text-[#141026] disabled:opacity-45"
+                                >
+                                  {giftMut.isPending ? "…" : "🎁 Send"}
+                                </button>
+                              </div>
+                            </form>
+                          )}
+                        </div>
+                      ) : (
+                        <p className="text-[11px] text-center text-[var(--dim)] pt-1 border-t border-white/10">
+                          This is your public trainer card! Share your handle so friends can visit &amp; cheer {visited.petName}.
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Recent Visitor Guestbook */}
+                    <div className="space-y-1.5">
+                      <h3 className="font-pixel text-[11px] text-[var(--dim)]">RECENT VISITORS</h3>
+                      {visited.recentVisits.length === 0 ? (
+                        <p className="text-xs text-[var(--dim)] rounded-xl bg-white/4 p-3">
+                          No visits yet — be the first to drop a Cheer or Meme Gift!
+                        </p>
+                      ) : (
+                        <ul className="space-y-1">
+                          {visited.recentVisits.map((v) => (
+                            <li
+                              key={v.id}
+                              className="flex items-center justify-between gap-2 rounded-xl bg-white/5 px-3 py-1.5 text-[11px]"
+                            >
+                              <span className="truncate text-white/90">
+                                {v.kind === "cheer"
+                                  ? `🤝 ${v.fromHandle} cheered ${visited.petName}`
+                                  : `🎁 ${v.fromHandle} gifted "${v.memeTitle ?? "Meme"}"${v.note ? ` — "${v.note}"` : ""}`}
+                              </span>
+                              <span className="text-[10px] text-[var(--dim)] shrink-0">
+                                {new Date(v.createdAt).toLocaleDateString()}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
             ) : (
-              <ul className="space-y-1.5">
-                {sortedBoard.map((entry, idx) => {
-                  const isMe = entry.userId === lbQuery.data?.currentUserId;
-                  const rankIcon = idx === 0 ? "🥇" : idx === 1 ? "🥈" : idx === 2 ? "🥉" : `#${idx + 1}`;
-                  return (
-                    <li
-                      key={entry.userId}
-                      className={`flex items-center gap-2.5 rounded-2xl border px-3 py-2 ${
-                        isMe ? "border-[var(--accent)] bg-[var(--accent)]/12" : "border-white/10 bg-white/4"
+              <>
+                <div className="flex flex-wrap gap-1.5">
+                  {(
+                    [
+                      ["xp", "⭐ XP"],
+                      ["streak", "🔥 Streak"],
+                      ["runner", "🏃 Runner"],
+                      ["blaster", "💥 Blaster"],
+                      ["beat", "🎵 Vibe Beat"],
+                      ["ember", "⚔️ Ember Vale"],
+                    ] as const
+                  ).map(([mId, lbl]) => (
+                    <button
+                      key={mId}
+                      type="button"
+                      onClick={() => setMetric(mId)}
+                      className={`rounded-full px-2.5 py-1 text-[11px] font-bold border ${
+                        metric === mId
+                          ? "border-[var(--accent)] bg-[var(--accent)] text-[#141026]"
+                          : "border-white/12 bg-white/5 text-[var(--dim)]"
                       }`}
                     >
-                      <span className="w-7 text-center font-bold text-sm shrink-0">{rankIcon}</span>
-                      <div className="w-9 h-9 shrink-0">
-                        <MemeMonster species={entry.species} displayStage={entry.stage} actualStage={entry.stage} mood="happy" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-xs font-extrabold text-white truncate">
-                          {entry.petName}{" "}
-                          <span className="font-normal text-[var(--dim)]">({entry.handle})</span>
-                        </p>
-                        <p className="text-[10px] text-[var(--dim)]">
-                          Stage {entry.stage} {entry.stageName} · {entry.digestedCount} digested
-                        </p>
-                      </div>
-                      <span className="font-mono text-xs font-extrabold text-[#fde047] shrink-0">
-                        {metricLabel(entry, metric)}
-                      </span>
-                    </li>
-                  );
-                })}
-              </ul>
+                      {lbl}
+                    </button>
+                  ))}
+                </div>
+
+                <p className="text-[11px] text-[var(--dim)]">
+                  Tap any trainer below to visit their monster, drop a daily Cheer, or send a Meme Gift!
+                </p>
+
+                {lbQuery.isPending ? (
+                  <p className="text-center text-xs text-[var(--dim)] py-6">Loading rankings…</p>
+                ) : sortedBoard.length === 0 ? (
+                  <p className="text-center text-xs text-[var(--dim)] py-6">Hatch a starter pet to join the rankings!</p>
+                ) : (
+                  <ul className="space-y-1.5">
+                    {sortedBoard.map((entry, idx) => {
+                      const isMe = entry.userId === lbQuery.data?.currentUserId;
+                      const rankIcon = idx === 0 ? "🥇" : idx === 1 ? "🥈" : idx === 2 ? "🥉" : `#${idx + 1}`;
+                      return (
+                        <li key={entry.userId}>
+                          <button
+                            type="button"
+                            onClick={() => setVisitingUserId(entry.userId)}
+                            className={`w-full flex items-center gap-2.5 rounded-2xl border px-3 py-2 text-left transition-all hover:border-[var(--accent)] ${
+                              isMe ? "border-[var(--accent)] bg-[var(--accent)]/12" : "border-white/10 bg-white/4 hover:bg-white/8"
+                            }`}
+                          >
+                            <span className="w-7 text-center font-bold text-sm shrink-0">{rankIcon}</span>
+                            <div className="w-9 h-9 shrink-0">
+                              <MemeMonster species={entry.species} displayStage={entry.stage} actualStage={entry.stage} mood="happy" />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <p className="text-xs font-extrabold text-white truncate">
+                                {entry.petName}{" "}
+                                <span className="font-normal text-[var(--dim)]">({entry.handle})</span>
+                              </p>
+                              <p className="text-[10px] text-[var(--dim)]">
+                                Stage {entry.stage} {entry.stageName} · {entry.digestedCount} digested
+                              </p>
+                            </div>
+                            <div className="text-right shrink-0">
+                              <span className="block font-mono text-xs font-extrabold text-[#fde047]">
+                                {metricLabel(entry, metric)}
+                              </span>
+                              <span className="text-[10px] font-bold text-[#7be6d8]">
+                                {isMe ? "Card →" : "Visit →"}
+                              </span>
+                            </div>
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </>
             )}
           </div>
         )}

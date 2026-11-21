@@ -11,12 +11,23 @@ import {
 import { CosmeticBadge, DreamScreensaver, StarterEgg, type DreamSlide } from "@memeagotchi/monster-ui";
 import {
   SnesArcadeCanvas,
+  configureEmberCloudSync,
   createGamepadController,
+  hydrateEmberFromCloud,
   type GamepadButton,
 } from "@memeagotchi/snes-games";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type PointerEvent } from "react";
-import { api, claimPairCode, clearPairedDevice, getPairedDevice, type StoredPairedDevice } from "./api";
+import {
+  api,
+  claimPairCode,
+  clearEmberCloudSave,
+  clearPairedDevice,
+  fetchEmberCloudSave,
+  getPairedDevice,
+  pushEmberCloudSave,
+  type StoredPairedDevice,
+} from "./api";
 import { HandheldBackdrop } from "./components/HandheldBackdrop";
 import { HandheldDeviceFrame } from "./components/HandheldDeviceFrame";
 import {
@@ -347,6 +358,16 @@ export function App() {
   const view: GameView | undefined = pet.data?.view;
   const mon = view?.monster;
 
+  // Cloud-Sync Ember Vale RPG saves across Web Companion & Paired Handheld
+  useEffect(() => {
+    configureEmberCloudSync({
+      push: pushEmberCloudSave,
+      clear: clearEmberCloudSave,
+    });
+    void hydrateEmberFromCloud(fetchEmberCloudSave);
+    return () => configureEmberCloudSync(null);
+  }, [pairedDevice?.deviceId]);
+
   // Real-time Server-Sent Events (SSE) live sync stream
   useEffect(() => {
     if (typeof EventSource === "undefined") return;
@@ -359,9 +380,13 @@ export function App() {
     const onUpdate = () => {
       void queryClient.invalidateQueries({ queryKey: ["gameState"] });
     };
+    const onEmberUpdate = () => {
+      void hydrateEmberFromCloud(fetchEmberCloudSave);
+    };
     es.addEventListener("connected", onConnected);
     es.addEventListener("state_updated", onUpdate);
     es.addEventListener("network_updated", onUpdate);
+    es.addEventListener("ember_save_updated", onEmberUpdate);
     es.onerror = onError;
     return () => {
       setSseLive(false);

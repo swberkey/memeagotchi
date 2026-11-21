@@ -13,14 +13,25 @@ import {
   ArcadeGamepad,
   SnesArcadeCanvas,
   cashOutEmberWallet,
+  configureEmberCloudSync,
   createGamepadController,
   eraseEmberSave,
+  getEmberCloudStatus,
   getEmberSnapshot,
+  hydrateEmberFromCloud,
   subscribeEmberStorage,
 } from "@memeagotchi/snes-games";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { api, fetchAuthMe, uploadMemeFile } from "./api";
+import {
+  api,
+  clearEmberCloudSave,
+  fetchAuthMe,
+  fetchEmberCloudSave,
+  pushEmberCloudSave,
+  uploadMemeFile,
+} from "./api";
+import { MemeCaptionStudio } from "./components/MemeCaptionStudio";
 import { MonsterSVG } from "./components/MonsterSVG";
 import { OnlineHubModal } from "./components/OnlineHubModal";
 import { TitleHatchScreen } from "./components/TitleHatchScreen";
@@ -110,11 +121,20 @@ export function App() {
   const [game, setGame] = useState<MiniGameId | null>("runner");
   const [gameResultBanner, setGameResultBanner] = useState("");
   const [emberSnap, setEmberSnap] = useState(() => getEmberSnapshot());
+  const [emberCloudStatus, setEmberCloudStatus] = useState(() => getEmberCloudStatus());
   const [emberWipeArmed, setEmberWipeArmed] = useState(false);
   const [emberResetTick, setEmberResetTick] = useState(0);
+  const [studioOpen, setStudioOpen] = useState(false);
   const gamepad = useMemo(() => createGamepadController(), []);
 
-  useEffect(() => subscribeEmberStorage(() => setEmberSnap(getEmberSnapshot())), []);
+  useEffect(
+    () =>
+      subscribeEmberStorage(() => {
+        setEmberSnap(getEmberSnapshot());
+        setEmberCloudStatus(getEmberCloudStatus());
+      }),
+    [],
+  );
   const [newName, setNewName] = useState("");
   const [talkDraft, setTalkDraft] = useState("");
 
@@ -161,6 +181,18 @@ export function App() {
   });
   const activeUser = authQuery.data?.actor.user ?? null;
 
+  // Cloud-Sync Ember Vale RPG saves with the signed-in account / guest session
+  useEffect(() => {
+    configureEmberCloudSync({
+      push: pushEmberCloudSave,
+      clear: clearEmberCloudSave,
+    });
+    void hydrateEmberFromCloud(fetchEmberCloudSave).then((updated) => {
+      if (updated) setEmberResetTick((t) => t + 1);
+    });
+    return () => configureEmberCloudSync(null);
+  }, [activeUser?.id]);
+
   // Real-time Server-Sent Events (SSE) live sync across devices & online community
   useEffect(() => {
     if (typeof EventSource === "undefined") return;
@@ -173,10 +205,14 @@ export function App() {
     const onDevice = () => {
       void qc.invalidateQueries({ queryKey: ["authMe"] });
     };
+    const onEmberSync = () => {
+      void hydrateEmberFromCloud(fetchEmberCloudSave);
+    };
     es.addEventListener("connected", onOpen);
     es.addEventListener("state_updated", onSync);
     es.addEventListener("network_updated", onSync);
     es.addEventListener("device_paired", onDevice);
+    es.addEventListener("ember_save_updated", onEmberSync);
     es.onerror = onErr;
     return () => {
       setLiveConnected(false);
@@ -448,6 +484,7 @@ export function App() {
         {onlineOpen && (
           <OnlineHubModal
             liveConnected={liveConnected}
+            myMemes={view.memes}
             onClose={() => setOnlineOpen(false)}
             onNotify={showToast}
           />
@@ -1039,22 +1076,46 @@ export function App() {
                 if (postTitle.trim()) postMut.mutate();
               }}
             >
-              <div className="flex items-center justify-between gap-2">
+              <div className="flex flex-wrap items-center justify-between gap-2">
                 <h3 className="font-pixel text-xs">DROP YOUR OWN MEME</h3>
-                <label className="px-3 py-1.5 rounded-xl bg-[var(--bg)]/60 border border-[var(--border)] text-xs font-bold cursor-pointer hover:border-[var(--accent)]">
-                  {uploading ? "Uploading…" : "📤 Upload Image (≤5 MB)"}
-                  <input
-                    type="file"
-                    accept="image/jpeg,image/png,image/gif,image/webp"
-                    className="hidden"
-                    onChange={(e) => void handleFileChange(e.target.files?.[0])}
-                  />
-                </label>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setStudioOpen((s) => !s)}
+                    className={`px-3 py-1.5 rounded-xl border text-xs font-bold ${
+                      studioOpen
+                        ? "border-[#fde047] bg-[#fde047] text-[#141026]"
+                        : "border-[#fde047]/45 bg-[#fde047]/12 text-[#fde047] hover:bg-[#fde047]/20"
+                    }`}
+                  >
+                    {studioOpen ? "✕ Hide Studio" : "✨ Caption Studio"}
+                  </button>
+                  <label className="px-3 py-1.5 rounded-xl bg-[var(--bg)]/60 border border-[var(--border)] text-xs font-bold cursor-pointer hover:border-[var(--accent)]">
+                    {uploading ? "Uploading…" : "📤 Upload Image (≤5 MB)"}
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/gif,image/webp"
+                      className="hidden"
+                      onChange={(e) => void handleFileChange(e.target.files?.[0])}
+                    />
+                  </label>
+                </div>
               </div>
 
-              {uploadedUrl ? (
-                <div className="relative rounded-xl overflow-hidden border-2 border-[var(--accent)]">
-                  <img src={uploadedUrl} alt="Uploaded meme preview" className="w-full h-44 object-cover" />
+              {studioOpen ? (
+                <MemeCaptionStudio
+                  sourceUrl={uploadedUrl ?? MEME_IMAGES[postImageKey] ?? MEME_IMAGES.distracted ?? ""}
+                  onApply={(url, suggestedCaption) => {
+                    setUploadedUrl(url);
+                    if (!postCaption.trim() && suggestedCaption) setPostCaption(suggestedCaption);
+                    setStudioOpen(false);
+                    showToast("✨ Captioned meme rendered & attached — add a title and post!");
+                  }}
+                  onClose={() => setStudioOpen(false)}
+                />
+              ) : uploadedUrl ? (
+                <div className="relative rounded-xl overflow-hidden border-2 border-[var(--accent)] bg-black/50">
+                  <img src={uploadedUrl} alt="Uploaded meme preview" className="w-full h-48 object-contain" />
                   <button
                     type="button"
                     onClick={() => setUploadedUrl(null)}
@@ -1534,8 +1595,23 @@ export function App() {
                     <div className="mt-3 rounded-2xl border border-[#f2a03d]/35 bg-[#191426]/90 p-3 space-y-2 text-xs">
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <div className="space-y-0.5">
-                          <p className="font-pixel text-[11px] text-[#f2a03d]">
-                            ⚔️ EMBER VALE · ESP32-S3 C99/WASM RPG
+                          <p className="font-pixel text-[11px] text-[#f2a03d] flex items-center gap-2 flex-wrap">
+                            <span>⚔️ EMBER VALE · ESP32-S3 C99/WASM RPG</span>
+                            <span
+                              className={`rounded-full px-2 py-0.5 font-sans text-[10px] font-bold ${
+                                emberCloudStatus === "synced"
+                                  ? "bg-emerald-500/20 text-emerald-300"
+                                  : emberCloudStatus === "syncing"
+                                    ? "bg-amber-500/20 text-amber-200"
+                                    : "bg-white/10 text-[var(--dim)]"
+                              }`}
+                            >
+                              {emberCloudStatus === "synced"
+                                ? "☁️ Cloud Save Synced"
+                                : emberCloudStatus === "syncing"
+                                  ? "☁️ Syncing…"
+                                  : "💾 Local Save"}
+                            </span>
                           </p>
                           <p className="text-[11px] text-[var(--dim)]">
                             ❤️ {emberSnap.status.hearts}/9 Hearts · 💎 {emberSnap.status.crystals}/2 Crystals ·{" "}
@@ -1717,6 +1793,7 @@ export function App() {
       {onlineOpen && (
         <OnlineHubModal
           liveConnected={liveConnected}
+          myMemes={view.memes}
           onClose={() => setOnlineOpen(false)}
           onNotify={showToast}
         />

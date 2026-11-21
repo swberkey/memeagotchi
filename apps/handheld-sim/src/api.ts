@@ -81,3 +81,37 @@ export async function claimPairCode(
   savePairedDevice(paired);
   return paired;
 }
+
+function deviceAuthHeaders(): Record<string, string> {
+  const dev = getPairedDevice();
+  return dev ? { authorization: `Bearer ${dev.deviceToken}` } : {};
+}
+
+export async function fetchEmberCloudSave(): Promise<{ files: Record<string, string>; updatedAt: number | null }> {
+  const res = await fetch("/api/ember-save", {
+    credentials: "same-origin",
+    headers: deviceAuthHeaders(),
+  });
+  const data = (await res.json()) as { ok?: boolean; files?: Record<string, string>; updatedAt?: number | null };
+  if (!res.ok || data.ok === false) throw new Error("Failed to fetch cloud Ember Vale save");
+  return { files: data.files ?? {}, updatedAt: data.updatedAt ?? null };
+}
+
+export async function pushEmberCloudSave(files: Record<string, string>): Promise<void> {
+  const res = await fetch("/api/ember-save", {
+    method: "PUT",
+    credentials: "same-origin",
+    headers: { "content-type": "application/json", ...deviceAuthHeaders() },
+    body: JSON.stringify({ files }),
+  });
+  if (!res.ok) throw new Error("Failed to sync Ember Vale save");
+}
+
+export async function clearEmberCloudSave(): Promise<void> {
+  const res = await fetch("/api/ember-save", {
+    method: "DELETE",
+    credentials: "same-origin",
+    headers: deviceAuthHeaders(),
+  });
+  if (!res.ok) throw new Error("Failed to clear cloud Ember Vale save");
+}
