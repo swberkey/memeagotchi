@@ -17,6 +17,16 @@ import {
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type PointerEvent } from "react";
 import { api, claimPairCode, clearPairedDevice, getPairedDevice, type StoredPairedDevice } from "./api";
+import { HandheldBackdrop } from "./components/HandheldBackdrop";
+import { HandheldDeviceFrame } from "./components/HandheldDeviceFrame";
+import {
+  BACKDROP_THEMES,
+  HANDHELD_MODELS,
+  getBackdropTheme,
+  getHandheldModel,
+  type BackdropThemeId,
+  type HandheldModelId,
+} from "./components/handheldModels";
 import { Monster } from "./Monster";
 
 import imgDistracted from "./assets/meme-distracted.jpg";
@@ -59,66 +69,26 @@ type Mode =
   | "post"
   | "settings";
 
-type ShellThemeId = "obsidian" | "lavender" | "mint" | "snes";
+const MODEL_STORAGE_KEY = "mg_handheld_model_v1";
+const BACKDROP_STORAGE_KEY = "mg_handheld_backdrop_v1";
 
-interface ShellTheme {
-  id: ShellThemeId;
-  name: string;
-  swatch: string;
-  shellBg: string;
-  shellBorder: string;
-  textMuted: string;
-  wellBg: string;
-  dpadBg: string;
-  dpadText: string;
+function loadStoredModel(): HandheldModelId {
+  try {
+    const v = localStorage.getItem(MODEL_STORAGE_KEY);
+    return getHandheldModel(v).id;
+  } catch {
+    return "dragon";
+  }
 }
 
-const SHELL_THEMES: readonly ShellTheme[] = [
-  {
-    id: "obsidian",
-    name: "Obsidian",
-    swatch: "#26233d",
-    shellBg: "linear-gradient(160deg, #2d2948 0%, #1d1a33 58%, #141226 100%)",
-    shellBorder: "rgba(196,181,253,0.22)",
-    textMuted: "#a49ec4",
-    wellBg: "radial-gradient(circle at 50% 50%, #100e20 0%, #1a1730 100%)",
-    dpadBg: "linear-gradient(180deg, #3c385c 0%, #26233d 100%)",
-    dpadText: "#f5f3ff",
-  },
-  {
-    id: "lavender",
-    name: "Atomic Purple",
-    swatch: "#7c5fd4",
-    shellBg: "linear-gradient(160deg, #6d55c7 0%, #523da6 55%, #3b2a82 100%)",
-    shellBorder: "rgba(233,213,255,0.4)",
-    textMuted: "#e5dcff",
-    wellBg: "radial-gradient(circle at 50% 50%, #2d1f66 0%, #422e8c 100%)",
-    dpadBg: "linear-gradient(180deg, #2a2444 0%, #1a1530 100%)",
-    dpadText: "#ffffff",
-  },
-  {
-    id: "mint",
-    name: "Mint Cream",
-    swatch: "#7be6d8",
-    shellBg: "linear-gradient(160deg, #b8fbf0 0%, #7be6d8 52%, #52c7be 100%)",
-    shellBorder: "rgba(255,255,255,0.65)",
-    textMuted: "#1a3c42",
-    wellBg: "radial-gradient(circle at 50% 50%, #3aa39d 0%, #58c2bb 100%)",
-    dpadBg: "linear-gradient(180deg, #2b2d47 0%, #1a1c30 100%)",
-    dpadText: "#ffffff",
-  },
-  {
-    id: "snes",
-    name: "Retro SNES",
-    swatch: "#d6d3df",
-    shellBg: "linear-gradient(160deg, #e5e3ec 0%, #cbc7d8 55%, #b1acc2 100%)",
-    shellBorder: "rgba(255,255,255,0.7)",
-    textMuted: "#47435c",
-    wellBg: "radial-gradient(circle at 50% 50%, #9b96ad 0%, #b7b2c7 100%)",
-    dpadBg: "linear-gradient(180deg, #3c3a4c 0%, #232230 100%)",
-    dpadText: "#ffffff",
-  },
-];
+function loadStoredBackdrop(fallback: BackdropThemeId): BackdropThemeId {
+  try {
+    const v = localStorage.getItem(BACKDROP_STORAGE_KEY);
+    return v ? getBackdropTheme(v).id : fallback;
+  } catch {
+    return fallback;
+  }
+}
 
 const LABELS: Label[] = ["tasty", "spicy", "blech"];
 const LABEL_FACE: Record<Label, string> = { tasty: "TASTY +2", spicy: "SPICY +3", blech: "BLECH -1" };
@@ -405,8 +375,33 @@ export function App() {
   }));
   useEffect(() => gameController.subscribeState(setHwPressed), [gameController]);
 
-  const [shellId, setShellId] = useState<ShellThemeId>("obsidian");
-  const shell = SHELL_THEMES.find((s) => s.id === shellId) ?? SHELL_THEMES[0]!;
+  const [modelId, setModelId] = useState<HandheldModelId>(() => loadStoredModel());
+  const model = getHandheldModel(modelId);
+  const [backdropId, setBackdropId] = useState<BackdropThemeId>(() =>
+    loadStoredBackdrop(getHandheldModel(loadStoredModel()).defaultBackdrop),
+  );
+  const backdrop = getBackdropTheme(backdropId);
+
+  const selectModel = useCallback((nextId: HandheldModelId) => {
+    const nextModel = getHandheldModel(nextId);
+    setModelId(nextId);
+    setBackdropId(nextModel.defaultBackdrop);
+    try {
+      localStorage.setItem(MODEL_STORAGE_KEY, nextId);
+      localStorage.setItem(BACKDROP_STORAGE_KEY, nextModel.defaultBackdrop);
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  const selectBackdrop = useCallback((nextBg: BackdropThemeId) => {
+    setBackdropId(nextBg);
+    try {
+      localStorage.setItem(BACKDROP_STORAGE_KEY, nextBg);
+    } catch {
+      /* ignore */
+    }
+  }, []);
 
   const [mode, setMode] = useState<Mode>("pet");
   const [initRouted, setInitRouted] = useState(false);
@@ -1256,164 +1251,20 @@ export function App() {
     [careMut, flashSensorBadge, blipOk],
   );
 
-  const dpadBtnStyle = (active: boolean) => ({
-    background: active
-      ? "linear-gradient(180deg, #99f6e4 0%, #2dd4bf 100%)"
-      : shell.dpadBg,
-    color: active ? "#141026" : shell.dpadText,
-    borderColor: "#0c0a18",
-    boxShadow: active
-      ? "0 0 12px rgba(123,230,216,0.6), inset 0 1px 0 rgba(255,255,255,0.5)"
-      : "inset 0 1px 0 rgba(255,255,255,0.16), 0 2px 5px rgba(0,0,0,0.45)",
-    transform: active ? "translateY(1px)" : undefined,
-  });
+  const statusTag = pttActive
+    ? "🎙️ MIC PTT"
+    : pairedDevice
+      ? `🔗 ${pairedDevice.accountHandle}`
+      : sseLive
+        ? "⚡ SSE LIVE"
+        : "320×240 IPS";
 
-  return (
-    <div className="min-h-screen text-[var(--text)]">
-      <main className="mx-auto flex max-w-[940px] flex-col items-center px-3 pb-12 pt-4">
-        {/* Top bar: Companion link + Collectible Shell Colorway Swatches */}
-        <div className="mb-3 flex w-full max-w-[880px] flex-wrap items-center justify-between gap-2 text-xs">
-          <div className="flex items-center gap-2">
-            <a
-              href={COMPANION_URL}
-              className="rounded-full border border-[var(--border)] bg-[var(--surface)]/90 px-3.5 py-1.5 font-bold text-[#7be6d8] hover:border-[#7be6d8]"
-            >
-              ← Web Companion
-            </a>
-            <span className="hidden sm:inline-block rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-semibold text-[var(--dim)]">
-              2.0" ST7789VW · 320×240 (4:3) IPS
-            </span>
-          </div>
+  const xSubLabel = mode === "play_game" && activeGame === "ember" ? "SWORD / OK" : "BACK / SP";
+  const oSubLabel = mode === "play_game" && activeGame === "ember" ? "ITEM / BACK" : "OK / ACT";
+  const menuSubLabel = mode === "play_game" && activeGame === "ember" ? "START · SAVE" : "MENU · HOLD 🎙️";
 
-          {/* Live Pocket Shell Colorway Switcher */}
-          <div className="flex items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--surface)]/90 px-2.5 py-1">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--dim)] px-1">Shell:</span>
-            {SHELL_THEMES.map((th) => (
-              <button
-                key={th.id}
-                type="button"
-                onClick={() => setShellId(th.id)}
-                title={`${th.name} Shell`}
-                aria-label={`${th.name} console shell`}
-                style={{ background: th.swatch, minHeight: "22px", width: "22px", height: "22px" }}
-                className={`rounded-full border-2 shrink-0 transition-transform ${
-                  shellId === th.id ? "scale-110 border-[#fde047] ring-2 ring-[#fde047]/40" : "border-black/40 opacity-80 hover:opacity-100"
-                }`}
-              />
-            ))}
-          </div>
-        </div>
-
-        {/* Boutique Landscape 320x240 (4:3) Micro-Console Shell */}
-        <div
-          className="w-full max-w-[880px] rounded-[46px] border-2 px-4 py-4 sm:px-7 sm:py-5 transition-all duration-300"
-          style={{
-            background: shell.shellBg,
-            borderColor: shell.shellBorder,
-            boxShadow:
-              "0 28px 70px rgba(4, 2, 16, 0.72), inset 0 2px 1px rgba(255,255,255,0.22), inset 0 -6px 16px rgba(0,0,0,0.25)",
-          }}
-        >
-          {/* Top Molded Console Branding Strip */}
-          <div className="mb-3 flex items-center justify-between px-2">
-            <div className="flex items-center gap-2">
-              <span
-                className="inline-block h-2.5 w-2.5 rounded-full transition-colors"
-                style={{
-                  background: pttActive ? "#fb7185" : (mon?.speciesDef.accentColor ?? "#7be6d8"),
-                  boxShadow: `0 0 10px ${pttActive ? "#fb7185" : (mon?.speciesDef.accentColor ?? "#7be6d8")}`,
-                }}
-                aria-hidden
-              />
-              <span className="font-game text-[10px] tracking-wider" style={{ color: shell.textMuted }}>
-                MEMEAGOTCHI-320
-              </span>
-              <span className="hidden sm:inline font-mono text-[10px] font-bold opacity-80" style={{ color: shell.textMuted }}>
-                · ESP32-S3 · 320×240 IPS · {pttActive ? "🎙️ MIC PTT" : pairedDevice ? `🔗 ${pairedDevice.accountHandle}` : sseLive ? "⚡ SSE LIVE" : "SYNC"}
-              </span>
-            </div>
-            {/* Speaker grille */}
-            <span className="flex gap-1.5" aria-hidden>
-              {[0, 1, 2, 3, 4].map((i) => (
-                <span key={i} className="h-[5px] w-[5px] rounded-full bg-black/45 shadow-inner" />
-              ))}
-            </span>
-          </div>
-
-          {/* 3-Column Ergonomic Handheld Deck */}
-          <div className="grid grid-cols-1 md:grid-cols-[136px_1fr_144px] items-center gap-4">
-            {/* LEFT WING: Recessed 4-Way Cross D-Pad */}
-            <div className="order-2 md:order-1 flex md:flex-col items-center justify-around md:justify-center gap-2.5">
-              <div
-                className="rounded-full p-2.5"
-                style={{
-                  background: shell.wellBg,
-                  boxShadow: "inset 0 4px 10px rgba(0,0,0,0.55), 0 1px 0 rgba(255,255,255,0.12)",
-                }}
-              >
-                <div className="grid grid-cols-3 grid-rows-3 gap-[2px]" role="group" aria-label="4-Way D-Pad">
-                  <div />
-                  <button
-                    type="button"
-                    aria-label="D-Pad Up"
-                    {...bindHw("up")}
-                    style={dpadBtnStyle(hwPressed.up)}
-                    className="h-9 w-9 rounded-t-lg border font-bold text-xs flex items-center justify-center"
-                  >
-                    ▲
-                  </button>
-                  <div />
-                  <button
-                    type="button"
-                    aria-label="D-Pad Left"
-                    {...bindHw("left")}
-                    style={dpadBtnStyle(hwPressed.left)}
-                    className="h-9 w-9 rounded-l-lg border font-bold text-xs flex items-center justify-center"
-                  >
-                    ◄
-                  </button>
-                  <div className="h-9 w-9 flex items-center justify-center" style={{ background: "#232038" }}>
-                    <span className="h-3 w-3 rounded-full bg-black/60 shadow-inner" />
-                  </div>
-                  <button
-                    type="button"
-                    aria-label="D-Pad Right"
-                    {...bindHw("right")}
-                    style={dpadBtnStyle(hwPressed.right)}
-                    className="h-9 w-9 rounded-r-lg border font-bold text-xs flex items-center justify-center"
-                  >
-                    ►
-                  </button>
-                  <div />
-                  <button
-                    type="button"
-                    aria-label="D-Pad Down"
-                    {...bindHw("down")}
-                    style={dpadBtnStyle(hwPressed.down)}
-                    className="h-9 w-9 rounded-b-lg border font-bold text-xs flex items-center justify-center"
-                  >
-                    ▼
-                  </button>
-                  <div />
-                </div>
-              </div>
-              <span className="font-mono text-[10px] font-bold tracking-widest hidden md:block" style={{ color: shell.textMuted }}>
-                D-PAD
-              </span>
-            </div>
-
-            {/* CENTER: Flush Glass-Lensed 320x240 (4:3) 262K Color IPS Display */}
-            <div
-              className="order-1 md:order-2 mx-auto w-full max-w-[496px] rounded-[24px] p-2.5 border-2 border-black"
-              style={{
-                background: "linear-gradient(155deg, #161524 0%, #090812 100%)",
-                boxShadow: "inset 0 2px 12px rgba(0,0,0,0.9), 0 6px 20px rgba(0,0,0,0.45)",
-              }}
-            >
-              <div
-                className="relative w-full aspect-[4/3] overflow-hidden rounded-[15px] border border-white/10"
-                style={{ background: "#0b0920" }}
-              >
+  const screenContent = (
+    <>
                 {pet.isPending || !view || !mon ? (
                   <div className="flex h-full items-center justify-center">
                     <div className="rounded-2xl border border-white/20 bg-[#1a1638] px-6 py-4 text-center">
@@ -2245,101 +2096,131 @@ export function App() {
                   </div>
                 )}
                 {flash > 0 && <div key={flash} className="anim-flash pointer-events-none absolute inset-0 z-30 bg-white" />}
-              </div>
-            </div>
+    </>
+  );
 
-            {/* RIGHT WING: Glossy Candy-Glass O (Confirm/Action), X (Back/Special), -- (Menu/Pause + Hold PTT) */}
-            <div className="order-3 flex md:flex-col items-center justify-around md:justify-center gap-4">
-              <div className="flex items-center gap-3.5">
-                <div className="flex flex-col items-center gap-1 mt-6">
-                  <button
-                    type="button"
-                    aria-label="X Button: Back or Species Signature Special"
-                    {...bindHw("x")}
-                    style={{
-                      background: hwPressed.x
-                        ? "linear-gradient(180deg, #f9a8d4 0%, #ec4899 100%)"
-                        : "linear-gradient(180deg, #d8b4fe 0%, #9333ea 60%, #6b21a8 100%)",
-                      color: hwPressed.x ? "#141026" : "#ffffff",
-                      borderBottom: "5px solid #3b0764",
-                      boxShadow: "0 6px 14px rgba(107,33,168,0.45), inset 0 2px 3px rgba(255,255,255,0.42)",
-                      transform: hwPressed.x ? "translateY(2px)" : undefined,
-                    }}
-                    className="h-13 w-13 rounded-full font-black text-lg flex items-center justify-center"
-                  >
-                    X
-                  </button>
-                  <span className="font-mono text-[10px] font-bold" style={{ color: shell.textMuted }}>
-                    {mode === "play_game" && activeGame === "ember" ? "SWORD / OK" : "BACK / SP"}
-                  </span>
-                </div>
+  return (
+    <div className="relative min-h-screen text-[var(--text)]">
+      {/* 5 Distinct Full-Screen Background Scene Templates */}
+      <HandheldBackdrop themeId={backdropId} />
 
-                <div className="flex flex-col items-center gap-1 -mt-6">
-                  <button
-                    type="button"
-                    aria-label="O Button: Confirm or Primary Action"
-                    {...bindHw("o")}
-                    style={{
-                      background: hwPressed.o
-                        ? "linear-gradient(180deg, #fef08a 0%, #facc15 100%)"
-                        : "linear-gradient(180deg, #99f6e4 0%, #2dd4bf 58%, #0d9488 100%)",
-                      color: "#141026",
-                      borderBottom: "5px solid #115e59",
-                      boxShadow: "0 6px 16px rgba(20,184,166,0.45), inset 0 2px 3px rgba(255,255,255,0.5)",
-                      transform: hwPressed.o ? "translateY(2px)" : undefined,
-                    }}
-                    className="h-14 w-14 rounded-full font-black text-xl flex items-center justify-center"
-                  >
-                    O
-                  </button>
-                  <span className="font-mono text-[10px] font-bold" style={{ color: shell.textMuted }}>
-                    {mode === "play_game" && activeGame === "ember" ? "ITEM / BACK" : "OK / ACT"}
-                  </span>
-                </div>
-              </div>
-
-              <div className="flex flex-col items-center gap-1">
-                <button
-                  type="button"
-                  aria-label="Menu Pause Button (Hold for Push-to-Talk Voice)"
-                  {...bindHw("menu")}
-                  style={{
-                    background: hwPressed.menu || pttActive
-                      ? "linear-gradient(180deg, #fef08a 0%, #facc15 100%)"
-                      : shell.dpadBg,
-                    color: hwPressed.menu || pttActive ? "#141026" : shell.dpadText,
-                    borderBottom: "4px solid #100e1f",
-                    boxShadow: "inset 0 1px 0 rgba(255,255,255,0.22), 0 4px 10px rgba(0,0,0,0.35)",
-                    transform: hwPressed.menu ? "translateY(1px)" : undefined,
-                  }}
-                  className="px-5 py-1.5 rounded-full font-mono text-xs font-black tracking-widest"
-                >
-                  --
-                </button>
-                <span className="font-mono text-[9.5px] font-bold" style={{ color: shell.textMuted }}>
-                  {mode === "play_game" && activeGame === "ember" ? "START / SAVE" : "MENU / HOLD:🎙️"}
-                </span>
-              </div>
-            </div>
+      <main className="relative z-10 mx-auto flex max-w-[920px] flex-col items-center px-3 pb-12 pt-3">
+        {/* Top bar: Web Companion Link + 5 Actual Handheld Model Picker + 5 Background Template Picker */}
+        <div className="mb-2 flex w-full max-w-[880px] flex-wrap items-center justify-between gap-2 text-xs">
+          <div className="flex items-center gap-2">
+            <a
+              href={COMPANION_URL}
+              className="rounded-full border border-white/15 bg-[#110e24]/85 px-3.5 py-1.5 font-bold text-[#7be6d8] backdrop-blur-md hover:border-[#7be6d8]"
+            >
+              ← Web Companion
+            </a>
+            <span className="hidden sm:inline-block rounded-full border border-white/12 bg-[#110e24]/75 px-3 py-1 text-[11px] font-semibold text-white/80 backdrop-blur-md">
+              {model.emoji} {model.name} · {backdrop.emoji} {backdrop.name}
+            </span>
           </div>
 
-          <p className="mt-3 text-center text-[11px] font-medium" style={{ color: shell.textMuted }}>
-            {mode === "play_game" && activeGame === "ember" ? (
-              <>
-                Ember Vale: <b>Arrows/WASD</b> Move · <b>X/J/Space</b> Sword/OK · <b>Z/K/O</b> Item/Back · <b>Enter/Esc</b> Start Menu (Save &amp; Exit)
-              </>
-            ) : (
-              <>
-                Keys: <b>Arrows/WASD</b> D-Pad (<b>▲</b> Fullscreen in Feed) · <b>Z/Space/Enter</b> O · <b>X/Backspace</b> X · <b>Esc/P</b> --
-              </>
-            )}
-          </p>
+          <span className="rounded-full border border-white/12 bg-[#110e24]/75 px-3 py-1 text-[10.5px] font-semibold text-[#fde047] backdrop-blur-md">
+            2.0" ST7789VW · 320×240 (4:3)
+          </span>
         </div>
+
+        {/* 5 Collectible Handheld Models & 5 Distinct Background Scene Templates */}
+        <section
+          aria-label="Handheld Model and Background Template Selector"
+          className="mb-2 flex w-full max-w-[880px] flex-col gap-2 rounded-2xl border border-white/15 bg-[#100d22]/80 px-3.5 py-2.5 text-xs shadow-xl backdrop-blur-md sm:flex-row sm:items-center sm:justify-between"
+        >
+          {/* 5 Handheld Shells */}
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="text-[10px] font-extrabold uppercase tracking-wider text-white/65 pr-0.5">
+              Model:
+            </span>
+            {HANDHELD_MODELS.map((mItem) => {
+              const active = modelId === mItem.id;
+              return (
+                <button
+                  key={mItem.id}
+                  type="button"
+                  onClick={() => selectModel(mItem.id)}
+                  title={mItem.subtitle}
+                  style={{ minHeight: "28px" }}
+                  className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-bold transition-all ${
+                    active
+                      ? "border-[#fde047] bg-white/18 text-white shadow-[0_0_12px_rgba(253,224,71,0.3)]"
+                      : "border-white/12 bg-white/6 text-white/75 hover:bg-white/12 hover:text-white"
+                  }`}
+                >
+                  <span
+                    className="inline-block h-3 w-3 rounded-full border border-white/40 shrink-0"
+                    style={{
+                      background: `linear-gradient(135deg, ${mItem.swatch} 50%, ${mItem.swatchAccent} 50%)`,
+                    }}
+                  />
+                  <span>
+                    {mItem.emoji} {mItem.shortName}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* 5 Distinct Background Templates */}
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="text-[10px] font-extrabold uppercase tracking-wider text-white/65 pr-0.5">
+              Scene:
+            </span>
+            {BACKDROP_THEMES.map((bgItem) => {
+              const active = backdropId === bgItem.id;
+              return (
+                <button
+                  key={bgItem.id}
+                  type="button"
+                  onClick={() => selectBackdrop(bgItem.id)}
+                  title={bgItem.description}
+                  style={{ minHeight: "26px" }}
+                  className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10.5px] font-bold transition-all ${
+                    active
+                      ? "border-[#7be6d8] bg-[#7be6d8]/20 text-[#7be6d8]"
+                      : "border-white/10 bg-white/5 text-white/70 hover:bg-white/12 hover:text-white"
+                  }`}
+                >
+                  <span>{bgItem.emoji}</span>
+                  <span className="hidden md:inline">{bgItem.shortName}</span>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+
+        {/* Sculpted Vertical Pocket Handheld Console (Exact Button Layout from Hardware Models) */}
+        <HandheldDeviceFrame
+          model={model}
+          screen={screenContent}
+          hwPressed={hwPressed}
+          bindHw={bindHw}
+          ledColor={mon?.speciesDef.accentColor ?? "#7be6d8"}
+          statusTag={statusTag}
+          xSubLabel={xSubLabel}
+          oSubLabel={oSubLabel}
+          menuSubLabel={menuSubLabel}
+          pttActive={pttActive}
+        />
+
+        <p className="mt-1 rounded-full border border-white/12 bg-[#100d22]/75 px-4 py-1.5 text-center text-[11px] font-medium text-white/85 backdrop-blur-md">
+          {mode === "play_game" && activeGame === "ember" ? (
+            <>
+              Ember Vale: <b>Arrows/WASD</b> Move · <b>X/J/Space</b> Sword/OK · <b>Z/K/O</b> Item/Back · <b>Enter/Esc</b> Start Menu (Save &amp; Exit)
+            </>
+          ) : (
+            <>
+              Keys: <b>Arrows/WASD</b> D-Pad (<b>▲</b> Fullscreen in Feed) · <b>Z/Space/Enter</b> O · <b>X/Backspace</b> X · <b>Esc/P</b> -- Menu
+            </>
+          )}
+        </p>
 
         {/* Always-On Carry Hardware Wake Sensor Strip (Light / Sound / Motion -> Meme Dream Screensaver) */}
         <section
           aria-label="Ambient Carry Wake Sensors"
-          className="mt-3.5 flex w-full max-w-[880px] flex-wrap items-center justify-between gap-2 rounded-2xl border border-[var(--border)] bg-[var(--surface)]/90 px-4 py-2.5 text-xs shadow-lg"
+          className="mt-3.5 flex w-full max-w-[880px] flex-wrap items-center justify-between gap-2 rounded-2xl border border-white/15 bg-[#100d22]/80 px-4 py-2.5 text-xs shadow-lg backdrop-blur-md"
         >
           <div className="min-w-0">
             <span className="font-bold text-[#fde047]">💭 Sleep Meme Dream Saver</span>
@@ -2388,7 +2269,7 @@ export function App() {
         {/* Cloud Account Pairing Strip (6-Char ESP32-S3 Bearer Sync Protocol) */}
         <section
           aria-label="Cloud Account Device Pairing"
-          className="mt-3 flex w-full max-w-[880px] flex-wrap items-center justify-between gap-2 rounded-2xl border border-[var(--border)] bg-[var(--surface)]/90 px-4 py-2.5 text-xs shadow-lg"
+          className="mt-3 flex w-full max-w-[880px] flex-wrap items-center justify-between gap-2 rounded-2xl border border-white/15 bg-[#100d22]/80 px-4 py-2.5 text-xs shadow-lg backdrop-blur-md"
         >
           {pairedDevice ? (
             <>
@@ -2459,7 +2340,7 @@ export function App() {
                 ? "Paste an image URL (https://…) to post to feed, or talk to your pet…"
                 : "🎙️ Hold -- or type here to talk (try 'feed', 'stonks', 'doge', 'sus')…"
             }
-            className="flex-1 rounded-2xl border border-[var(--border)] bg-[var(--surface)]/90 px-4 py-2.5 text-sm text-[var(--text)] outline-none focus:border-[#7be6d8]"
+            className="flex-1 rounded-2xl border border-white/15 bg-[#100d22]/82 px-4 py-2.5 text-sm text-[var(--text)] outline-none backdrop-blur-md focus:border-[#7be6d8]"
           />
           <button
             type="submit"
@@ -2471,12 +2352,12 @@ export function App() {
         </form>
 
         {notice && (
-          <p className="mt-2 w-full max-w-[880px] rounded-2xl border border-[#7be6d8]/35 bg-[var(--surface)]/90 px-4 py-2 text-xs font-medium text-[#7be6d8]">
+          <p className="mt-2 w-full max-w-[880px] rounded-2xl border border-[#7be6d8]/35 bg-[#100d22]/85 px-4 py-2 text-xs font-medium text-[#7be6d8] backdrop-blur-md">
             {notice}
           </p>
         )}
 
-        <details className="mt-3 w-full max-w-[880px] rounded-2xl border border-[var(--border)] bg-[var(--surface)]/80 px-4 py-2.5 text-xs text-[var(--dim)]">
+        <details className="mt-3 w-full max-w-[880px] rounded-2xl border border-white/15 bg-[#100d22]/80 px-4 py-2.5 text-xs text-white/75 backdrop-blur-md">
           <summary className="cursor-pointer font-semibold text-[var(--text)]">
             Hardware Spec (320×240 IPS) &amp; Secret Voice Words ({view?.secrets.length ?? 0}/10 unlocked)
           </summary>
