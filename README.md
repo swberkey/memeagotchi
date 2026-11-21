@@ -2,13 +2,18 @@
 
 A Tamagotchi-style virtual pet whose food, power source, and social currency are memes — unified across a **Web Companion App** and a **Landscape 320×240 (4:3) ESP32-S3 Handheld Simulator** on one deterministic TypeScript game engine.
 
-## What's Inside (v1.2 · 320×240 Edition)
+## What's Inside (v1.3 · 320×240 Online Edition)
 - **Title Screen & 5 Playable Starter Species:** Choose from **Mint Dragon (Mochi)**, **Spicy Imp (Scoville)**, **Cyber Cat (Pixel)**, **Cozy Frog (Pebbles)**, or **Cursed Ghost (Wisp)** — each with custom concept sheets in `docs/art/`, distinct stat-curve archetypes, voice banter, and an exclusive **`X` Signature Special Move**.
 - **3 60fps `320×240` (4:3) SNES Mini-Games (`@memeagotchi/snes-games`):**
   1. **Meme Runner DX** — SNES side-scrolling platformer with floating platforms, stompable enemies, double-jump, and species specials.
   2. **Troll Blaster** — 8-way top-down arena shooter with enemy waves and mini-bosses.
   3. **Vibe Beat** — Live WebAudio chiptune rhythm stage with dancing dressed-up monster and 5-lane beat highway (`◄ ▼ ▲ ► O` + `X` Special).
 - **Full-Screen Meme Feed (`▲`) & Always-On Meme Dream Screensaver:** Press `▲` Up Arrow while feeding for edge-to-edge full-screen memes. While sleeping, Light / Sound / Motion wake the handheld into a full-screen 4:3 slideshow of the memes your monster has fed on, with a **1/8-size gliding pixel sleeping monster**.
+- **Multi-User Online Hub, 6-Char Handheld Pairing & Real-Time SSE Sync:**
+  - Create a cloud account (`@handle` + password, `scrypt` hashed, signed `HttpOnly` cookie session) for an isolated SQLite pet save — or play immediately as a zero-friction Local Guest.
+  - Pair any **320×240 Handheld Simulator** or physical **ESP32-S3 MemeAgotchi** via a 10-minute **6-character pair code** (`POST /api/devices/pair-code` → `POST /api/devices/claim`) issuing a revocable Bearer `mgd_...` token.
+  - **Real-Time Server-Sent Events (`GET /api/events`):** Instant cross-device sync across Web Companion + paired handhelds, cross-account community meme sharing & live votes, and a **Global Leaderboard** (`GET /api/leaderboard`) sortable by XP, Care Streak, Runner DX, Troll Blaster, and Vibe Beat.
+  - **Mobile PWA Ready:** Installable Web App Manifest (`manifest.webmanifest`) for iOS & Android home screens.
 - **Hardware Alignment (`2.0" ST7789VW / 2.4" ILI9341 320×240 IPS TFT`):** 240×320 native panel rotated to **Landscape `320×240` (4:3 QVGA)** (262K color, 4-wire SPI) paired with an **ESP32-S3**, tactile **4-way D-Pad + `O` / `X` / `--`**, and Light/Sound/Motion carry-wake sensors.
 - **Full Progression Loop:** Personal Best High Scores & Max Combos per game, Daily Care Streak bonuses, and active **5 / 15 / 30 Digestion Milestone Powers** (`Turbo Charge`, `Second Wind`, `Meme Overdrive ×1.5`) usable in every mini-game.
 
@@ -54,11 +59,11 @@ npm start
 ## Shared Live State
 Both **Web Companion** (`/`) and **Handheld Simulator** (`/handheld/`) talk to the exact same SQLite-backed unified server (`apps/server/data/memeagotchi.db`). Actions taken in either UI — hatching a starter, feeding memes, voting, posting uploads, unlocking secret words by label or voice, buying/equipping Drip, beating SNES Arcade high scores, or toggling Demo 60× vs Real-Time 1× clock — stay live-synced across both views.
 
-## Deploying
-The repo ships with a production multi-stage `Dockerfile` and serves both apps + API + uploads from one Node 22 process (`PORT` defaults to `3000`, `DATA_DIR` defaults to `./apps/server/data`):
+## Deploying Online
+The repo ships with a production multi-stage `Dockerfile`, `.env.example`, and ready-to-use deployment manifests for **Render (`render.yaml`)**, **Fly.io (`fly.toml`)**, and **Railway (`railway.json`)** serving both apps + API + SSE + SQLite + uploads from one Node 22 process (`PORT` defaults to `3000`, `DATA_DIR` defaults to `./apps/server/data`):
 
 ```bash
 docker build -t memeagotchi .
-docker run -p 3000:3000 -v memeagotchi-data:/app/data -e DATA_DIR=/app/data memeagotchi
+docker run -p 3000:3000 -v memeagotchi-data:/app/data -e DATA_DIR=/app/data -e SESSION_SECRET=$(openssl rand -hex 32) memeagotchi
 ```
-It deploys directly to Railway, Render, Fly.io, or any Node 22 container host with a persistent volume mounted at `/app/data`.
+See [`docs/online-deployment.md`](docs/online-deployment.md) for step-by-step Railway, Render, Fly.io, and ESP32-S3 HTTPS pairing setup.

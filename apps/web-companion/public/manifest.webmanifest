@@ -1,0 +1,16 @@
+{
+  "name": "MemeAgotchi — 320×240 Companion",
+  "short_name": "MemeAgotchi",
+  "description": "Raise a meme-powered pocket monster across the Web Companion and 320×240 ESP32-S3 Handheld.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0e0b20",
+  "theme_color": "#0e0b20",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 128 128'><rect width='128' height='128' rx='28' fill='%23191435'/><text x='64' y='88' text-anchor='middle' font-size='78'>🥚</text></svg>",
+      "sizes": "128x128",
+      "type": "image/svg+xml"
+    }
+  ]
+}

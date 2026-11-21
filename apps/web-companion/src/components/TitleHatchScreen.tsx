@@ -24,19 +24,23 @@ function StatPipBar({ label, value, color }: { label: string; value: number; col
 export function TitleHatchScreen({
   view,
   handheldUrl,
+  accountLabel,
   hatching,
   onContinue,
   onHatch,
   onToggleClock,
   onToggleSound,
+  onOpenOnline,
 }: {
   view: GameView;
   handheldUrl: string;
+  accountLabel?: string;
   hatching: boolean;
   onContinue: () => void;
   onHatch: (species: SpeciesId, name: string) => void;
   onToggleClock: () => void;
   onToggleSound: () => void;
+  onOpenOnline?: () => void;
 }) {
   const [subView, setSubView] = useState<"title" | "picker">(view.hatched ? "title" : "picker");
   const [selectedSpecies, setSelectedSpecies] = useState<SpeciesId>(view.monster.species ?? "mint-dragon");
@@ -130,6 +134,15 @@ export function TitleHatchScreen({
 
             {/* Quick Settings Row */}
             <div className="flex flex-wrap items-center justify-center gap-2 pt-1 text-xs">
+              {onOpenOnline && (
+                <button
+                  type="button"
+                  onClick={onOpenOnline}
+                  className="px-3 py-1.5 rounded-full bg-[var(--accent)]/15 border border-[var(--accent)]/50 font-bold text-[var(--accent)] hover:bg-[var(--accent)]/25"
+                >
+                  🌐 {accountLabel ?? "Online / Sign In"}
+                </button>
+              )}
               <button
                 type="button"
                 onClick={onToggleClock}
@@ -298,7 +311,16 @@ export function TitleHatchScreen({
 
             {/* Footer mode switch */}
             <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-[var(--border)]/60 text-xs">
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
+                {onOpenOnline && (
+                  <button
+                    type="button"
+                    onClick={onOpenOnline}
+                    className="px-2.5 py-1 rounded-full bg-[var(--accent)]/15 border border-[var(--accent)]/50 font-bold text-[var(--accent)]"
+                  >
+                    🌐 {accountLabel ?? "Sign In"}
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={onToggleClock}

@@ -3,7 +3,20 @@ import http, { type IncomingMessage, type ServerResponse } from "node:http";
 import path from "node:path";
 import { dispatchAction, RpcError } from "@memeagotchi/rpc-sdk";
 import { Actions, type ServerCtx } from "./actions.ts";
-import { GameRepository } from "./db.ts";
+import {
+  formatSessionCookie,
+  hashPassword,
+  loadOrCreateSessionSecret,
+  parseCookies,
+  SESSION_COOKIE_NAME,
+  SESSION_TTL_MS,
+  signSessionToken,
+  validateHandle,
+  validatePassword,
+  verifyPassword,
+  verifySessionToken,
+} from "./auth.ts";
+import { DEFAULT_USER_ID, GameRepository, type UserAccount } from "./db.ts";
 import { MAX_UPLOAD_BYTES, UploadStore } from "./uploads.ts";
 
 export interface AppServerOptions {
@@ -11,6 +24,9 @@ export interface AppServerOptions {
   uploadsDir: string;
   webDistDir?: string;
   handheldDistDir?: string;
+  sessionSecret?: string;
+  corsOrigin?: string;
+  rateLimitMaxPerMin?: number;
   now?: () => number;
 }
 
@@ -20,6 +36,7 @@ const STATIC_MIMES: Record<string, string> = {
   ".mjs": "application/javascript; charset=utf-8",
   ".css": "text/css; charset=utf-8",
   ".json": "application/json; charset=utf-8",
+  ".webmanifest": "application/manifest+json; charset=utf-8",
   ".svg": "image/svg+xml",
   ".png": "image/png",
   ".jpg": "image/jpeg",
@@ -29,6 +46,14 @@ const STATIC_MIMES: Record<string, string> = {
   ".ico": "image/x-icon",
   ".woff2": "font/woff2",
 };
+
+interface ResolvedActor {
+  userId: string;
+  mode: "user" | "device" | "guest";
+  user: UserAccount | null;
+  deviceId?: string;
+  deviceName?: string;
+}
 
 async function readBody(req: IncomingMessage, maxBytes: number): Promise<Buffer> {
   const chunks: Buffer[] = [];
@@ -44,17 +69,65 @@ async function readBody(req: IncomingMessage, maxBytes: number): Promise<Buffer>
   return Buffer.concat(chunks);
 }
 
-function sendJson(res: ServerResponse, status: number, payload: unknown): void {
+async function readJsonBody<T>(req: IncomingMessage, maxBytes = 64 * 1024): Promise<T> {
+  const raw = await readBody(req, maxBytes);
+  try {
+    return (raw.length ? JSON.parse(raw.toString("utf-8")) : {}) as T;
+  } catch {
+    throw new RpcError(400, "Invalid JSON body.");
+  }
+}
+
+function getClientIp(req: IncomingMessage): string {
+  const fwd = req.headers["x-forwarded-for"];
+  if (typeof fwd === "string" && fwd.trim()) {
+    return fwd.split(",")[0]!.trim();
+  }
+  return req.socket.remoteAddress ?? "local";
+}
+
+function isSecureRequest(req: IncomingMessage): boolean {
+  const proto = req.headers["x-forwarded-proto"];
+  if (typeof proto === "string" && proto.toLowerCase().includes("https")) return true;
+  return Boolean((req.socket as { encrypted?: boolean }).encrypted);
+}
+
+function buildSecurityHeaders(corsOrigin?: string): Record<string, string> {
+  const h: Record<string, string> = {
+    "x-content-type-options": "nosniff",
+    "x-frame-options": "SAMEORIGIN",
+    "referrer-policy": "same-origin",
+    "permissions-policy": "camera=(), geolocation=()",
+  };
+  if (corsOrigin) {
+    h["access-control-allow-origin"] = corsOrigin;
+    h["access-control-allow-credentials"] = "true";
+    h["access-control-allow-headers"] = "content-type, authorization";
+    h["access-control-allow-methods"] = "GET, POST, DELETE, OPTIONS";
+  }
+  return h;
+}
+
+function sendJson(
+  res: ServerResponse,
+  status: number,
+  payload: unknown,
+  extraHeaders?: Record<string, string>,
+): void {
   const body = JSON.stringify(payload);
   res.writeHead(status, {
     "content-type": "application/json; charset=utf-8",
-    "x-content-type-options": "nosniff",
-    "referrer-policy": "same-origin",
+    ...extraHeaders,
   });
   res.end(body);
 }
 
-function tryServeStatic(res: ServerResponse, distDir: string | undefined, relPath: string): boolean {
+function tryServeStatic(
+  res: ServerResponse,
+  distDir: string | undefined,
+  relPath: string,
+  baseHeaders: Record<string, string>,
+): boolean {
   if (!distDir || !fs.existsSync(distDir)) return false;
   const cleanRel = relPath.replace(/^\/+/, "") || "index.html";
   const resolvedRoot = path.resolve(distDir);
@@ -62,7 +135,6 @@ function tryServeStatic(res: ServerResponse, distDir: string | undefined, relPat
   if (!target.startsWith(resolvedRoot)) return false;
 
   if (!fs.existsSync(target) || fs.statSync(target).isDirectory()) {
-    // SPA fallback for client routes without a file extension
     if (path.extname(cleanRel)) return false;
     target = path.join(resolvedRoot, "index.html");
     if (!fs.existsSync(target)) return false;
@@ -72,8 +144,8 @@ function tryServeStatic(res: ServerResponse, distDir: string | undefined, relPat
   const mime = STATIC_MIMES[ext] ?? "application/octet-stream";
   const isHashedAsset = cleanRel.startsWith("assets/");
   res.writeHead(200, {
+    ...baseHeaders,
     "content-type": mime,
-    "x-content-type-options": "nosniff",
     "cache-control": isHashedAsset ? "public, max-age=31536000, immutable" : "no-cache",
   });
   fs.createReadStream(target).pipe(res);
@@ -83,74 +155,405 @@ function tryServeStatic(res: ServerResponse, distDir: string | undefined, relPat
 export function createAppServer(options: AppServerOptions) {
   const repo = new GameRepository(options.dbPath);
   const uploads = new UploadStore(options.uploadsDir);
-  const ctx: ServerCtx = {
-    repo,
-    uploads,
-    now: options.now ?? (() => Date.now()),
+  const now = options.now ?? (() => Date.now());
+  const startedAt = now();
+  const sessionSecret =
+    options.sessionSecret ??
+    loadOrCreateSessionSecret(options.dbPath === ":memory:" ? undefined : path.dirname(options.dbPath));
+  const corsOrigin = options.corsOrigin ?? process.env.CORS_ORIGIN ?? undefined;
+  const baseHeaders = buildSecurityHeaders(corsOrigin);
+
+  // Simple sliding-window per-IP rate limiter
+  const rateBuckets = new Map<string, { count: number; resetAt: number }>();
+  const defaultLimit = options.rateLimitMaxPerMin ?? 240;
+
+  const checkRateLimit = (ip: string, bucket: string, limit: number): boolean => {
+    if (limit <= 0) return true;
+    const t = now();
+    const key = `${bucket}:${ip}`;
+    const cur = rateBuckets.get(key);
+    if (!cur || t >= cur.resetAt) {
+      rateBuckets.set(key, { count: 1, resetAt: t + 60_000 });
+      return true;
+    }
+    if (cur.count >= limit) return false;
+    cur.count += 1;
+    return true;
+  };
+
+  // Real-time Server-Sent Events (SSE) live sync hub per userId
+  const sseClients = new Map<string, Set<ServerResponse>>();
+  const addSseClient = (userId: string, res: ServerResponse) => {
+    let set = sseClients.get(userId);
+    if (!set) {
+      set = new Set();
+      sseClients.set(userId, set);
+    }
+    set.add(res);
+  };
+  const removeSseClient = (userId: string, res: ServerResponse) => {
+    const set = sseClients.get(userId);
+    if (!set) return;
+    set.delete(res);
+    if (set.size === 0) sseClients.delete(userId);
+  };
+  const countSseClients = (): number => {
+    let n = 0;
+    for (const set of sseClients.values()) n += set.size;
+    return n;
+  };
+  const broadcastToUser = (userId: string, eventName: string, payload: unknown) => {
+    const set = sseClients.get(userId);
+    if (!set || set.size === 0) return;
+    const msg = `event: ${eventName}\ndata: ${JSON.stringify(payload)}\n\n`;
+    for (const client of set) {
+      try {
+        client.write(msg);
+      } catch {
+        set.delete(client);
+      }
+    }
+  };
+  const broadcastGlobal = (eventName: string, payload: unknown) => {
+    const msg = `event: ${eventName}\ndata: ${JSON.stringify(payload)}\n\n`;
+    for (const set of sseClients.values()) {
+      for (const client of set) {
+        try {
+          client.write(msg);
+        } catch {
+          set.delete(client);
+        }
+      }
+    }
+  };
+
+  const sseHeartbeat = setInterval(() => {
+    for (const set of sseClients.values()) {
+      for (const client of set) {
+        try {
+          client.write(": ping\n\n");
+        } catch {
+          set.delete(client);
+        }
+      }
+    }
+  }, 25_000);
+  sseHeartbeat.unref?.();
+
+  const resolveActor = (req: IncomingMessage, url: URL): ResolvedActor => {
+    const t = now();
+
+    // 1. Handheld / ESP32-S3 Bearer Device Token (or query param for EventSource)
+    const authHeader = req.headers.authorization;
+    const bearer =
+      typeof authHeader === "string" && authHeader.toLowerCase().startsWith("bearer ")
+        ? authHeader.slice(7).trim()
+        : (url.searchParams.get("deviceToken")?.trim() ?? "");
+
+    if (bearer) {
+      const dev = repo.authenticateDeviceToken(bearer, t);
+      if (!dev) {
+        throw new RpcError(401, "Device token invalid or revoked. Please re-pair your handheld.");
+      }
+      const user = dev.userId === DEFAULT_USER_ID ? null : repo.getUserById(dev.userId);
+      return {
+        userId: dev.userId,
+        mode: "device",
+        user,
+        deviceId: dev.deviceId,
+        deviceName: dev.deviceName,
+      };
+    }
+
+    // 2. Signed HttpOnly Session Cookie
+    const cookies = parseCookies(req.headers.cookie);
+    const rawSession = cookies[SESSION_COOKIE_NAME];
+    if (rawSession) {
+      const uid = verifySessionToken(rawSession, sessionSecret, t);
+      if (uid) {
+        const user = repo.getUserById(uid);
+        if (user) {
+          return { userId: user.id, mode: "user", user };
+        }
+      }
+    }
+
+    // 3. Zero-friction Guest / Local Default
+    return { userId: DEFAULT_USER_ID, mode: "guest", user: null };
   };
 
   const server = http.createServer(async (req, res) => {
     try {
       const url = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
       const pathname = url.pathname;
+      const ip = getClientIp(req);
 
-      // Health endpoint
+      // CORS preflight
+      if (req.method === "OPTIONS") {
+        res.writeHead(204, baseHeaders);
+        res.end();
+        return;
+      }
+
+      // Health check endpoint (Railway / Render / Fly.io / Docker)
       if (req.method === "GET" && pathname === "/api/health") {
-        sendJson(res, 200, { ok: true, service: "memeagotchi", now: ctx.now() });
+        sendJson(
+          res,
+          200,
+          {
+            ok: true,
+            service: "memeagotchi",
+            version: "1.2.0",
+            uptimeSec: Math.max(0, Math.floor((now() - startedAt) / 1000)),
+            accounts: repo.countUsers(),
+            activeStreams: countSseClients(),
+            now: now(),
+          },
+          baseHeaders,
+        );
         return;
       }
 
-      // Unified typed RPC actions endpoint
+      /* ==================== Auth Endpoints ==================== */
+
+      if (req.method === "GET" && pathname === "/api/auth/me") {
+        const actor = resolveActor(req, url);
+        sendJson(
+          res,
+          200,
+          {
+            ok: true,
+            actor: {
+              userId: actor.userId,
+              mode: actor.mode,
+              user: actor.user,
+              deviceId: actor.deviceId ?? null,
+              deviceName: actor.deviceName ?? null,
+            },
+            pairedDevices: repo.listPairedDevices(actor.userId),
+          },
+          baseHeaders,
+        );
+        return;
+      }
+
+      if (req.method === "POST" && pathname === "/api/auth/register") {
+        if (!checkRateLimit(ip, "auth", 30)) {
+          throw new RpcError(429, "Too many auth requests. Please wait a minute.");
+        }
+        const body = await readJsonBody<{ handle?: string; password?: string; displayName?: string }>(req);
+        const hCheck = validateHandle(String(body.handle ?? ""));
+        if (!hCheck.ok) throw new RpcError(400, hCheck.error);
+        const pCheck = validatePassword(String(body.password ?? ""));
+        if (!pCheck.ok) throw new RpcError(400, pCheck.error);
+
+        if (repo.findUserForLogin(hCheck.handle)) {
+          throw new RpcError(409, `Handle @${hCheck.handle} is already taken.`);
+        }
+        const t = now();
+        const displayName = String(body.displayName ?? "").trim().slice(0, 28) || hCheck.handle;
+        const user = repo.createUser(hCheck.handle, displayName, hashPassword(String(body.password)), t);
+        const token = signSessionToken(user.id, sessionSecret, t);
+        sendJson(
+          res,
+          201,
+          { ok: true, user },
+          {
+            ...baseHeaders,
+            "set-cookie": formatSessionCookie(token, SESSION_TTL_MS / 1000, isSecureRequest(req)),
+          },
+        );
+        return;
+      }
+
+      if (req.method === "POST" && pathname === "/api/auth/login") {
+        if (!checkRateLimit(ip, "auth", 30)) {
+          throw new RpcError(429, "Too many login attempts. Please wait a minute.");
+        }
+        const body = await readJsonBody<{ handle?: string; password?: string }>(req);
+        const handle = String(body.handle ?? "").trim().toLowerCase().replace(/^@+/, "");
+        const password = String(body.password ?? "");
+        const found = repo.findUserForLogin(handle);
+        if (!found || !verifyPassword(password, found.passwordHash)) {
+          throw new RpcError(401, "Invalid handle or password.");
+        }
+        const t = now();
+        const token = signSessionToken(found.id, sessionSecret, t);
+        const user: UserAccount = {
+          id: found.id,
+          handle: found.handle,
+          displayName: found.displayName,
+          createdAt: found.createdAt,
+        };
+        sendJson(
+          res,
+          200,
+          { ok: true, user },
+          {
+            ...baseHeaders,
+            "set-cookie": formatSessionCookie(token, SESSION_TTL_MS / 1000, isSecureRequest(req)),
+          },
+        );
+        return;
+      }
+
+      if (req.method === "POST" && pathname === "/api/auth/logout") {
+        sendJson(
+          res,
+          200,
+          { ok: true },
+          {
+            ...baseHeaders,
+            "set-cookie": formatSessionCookie("", 0, isSecureRequest(req)),
+          },
+        );
+        return;
+      }
+
+      /* ==================== 6-Character Handheld Device Pairing ==================== */
+
+      if (req.method === "POST" && pathname === "/api/devices/pair-code") {
+        const actor = resolveActor(req, url);
+        const pair = repo.createPairCode(actor.userId, now());
+        sendJson(res, 200, { ok: true, code: pair.code, expiresAt: pair.expiresAt }, baseHeaders);
+        return;
+      }
+
+      if (req.method === "POST" && pathname === "/api/devices/claim") {
+        if (!checkRateLimit(ip, "pair", 30)) {
+          throw new RpcError(429, "Too many pairing attempts. Please wait a minute.");
+        }
+        const body = await readJsonBody<{ code?: string; deviceName?: string }>(req);
+        const claimed = repo.claimPairCode(
+          String(body.code ?? ""),
+          String(body.deviceName ?? "MemeAgotchi-320"),
+          now(),
+        );
+        if (!claimed) {
+          throw new RpcError(400, "Invalid or expired 6-character pairing code.");
+        }
+        broadcastToUser(claimed.userId, "device_paired", { deviceId: claimed.deviceId, at: now() });
+        sendJson(
+          res,
+          200,
+          {
+            ok: true,
+            deviceId: claimed.deviceId,
+            deviceToken: claimed.deviceToken,
+            accountHandle: claimed.accountHandle,
+          },
+          baseHeaders,
+        );
+        return;
+      }
+
+      if (req.method === "DELETE" && pathname.startsWith("/api/devices/")) {
+        const actor = resolveActor(req, url);
+        const deviceId = decodeURIComponent(pathname.slice("/api/devices/".length));
+        const revoked = repo.revokePairedDevice(actor.userId, deviceId);
+        sendJson(res, 200, { ok: true, revoked }, baseHeaders);
+        return;
+      }
+
+      /* ==================== Online Global Leaderboard ==================== */
+
+      if (req.method === "GET" && pathname === "/api/leaderboard") {
+        const actor = resolveActor(req, url);
+        sendJson(
+          res,
+          200,
+          {
+            ok: true,
+            entries: repo.getLeaderboard(now()),
+            currentUserId: actor.userId,
+          },
+          baseHeaders,
+        );
+        return;
+      }
+
+      /* ==================== Real-Time SSE Live Sync Stream ==================== */
+
+      if (req.method === "GET" && pathname === "/api/events") {
+        const actor = resolveActor(req, url);
+        res.writeHead(200, {
+          ...baseHeaders,
+          "content-type": "text/event-stream; charset=utf-8",
+          "cache-control": "no-cache, no-transform",
+          connection: "keep-alive",
+        });
+        addSseClient(actor.userId, res);
+        res.write(
+          `event: connected\ndata: ${JSON.stringify({ userId: actor.userId, mode: actor.mode, at: now() })}\n\n`,
+        );
+        req.on("close", () => removeSseClient(actor.userId, res));
+        return;
+      }
+
+      /* ==================== Unified Typed RPC Actions ==================== */
+
       if (req.method === "POST" && pathname === "/api/actions") {
-        const raw = await readBody(req, 512 * 1024);
-        let parsed: { action?: unknown; args?: unknown };
-        try {
-          parsed = JSON.parse(raw.toString("utf-8")) as { action?: unknown; args?: unknown };
-        } catch {
-          sendJson(res, 400, { ok: false, error: "Invalid JSON body." });
-          return;
+        if (!checkRateLimit(ip, "actions", defaultLimit)) {
+          throw new RpcError(429, "Rate limit exceeded. Slow down a touch!");
         }
+        const actor = resolveActor(req, url);
+        const parsed = await readJsonBody<{ action?: unknown; args?: unknown }>(req, 512 * 1024);
         if (typeof parsed.action !== "string") {
-          sendJson(res, 400, { ok: false, error: "Missing action name." });
+          sendJson(res, 400, { ok: false, error: "Missing action name." }, baseHeaders);
           return;
         }
+        const ctx: ServerCtx = {
+          repo: repo.forUser(actor.userId),
+          uploads,
+          now,
+        };
         const result = await dispatchAction(Actions, ctx, parsed.action, parsed.args);
-        sendJson(res, 200, { ok: true, result });
+        if (parsed.action !== "getState") {
+          broadcastToUser(actor.userId, "state_updated", { action: parsed.action, at: now() });
+          if (parsed.action === "postMeme" || parsed.action === "voteMeme" || parsed.action === "shareMeme") {
+            broadcastGlobal("network_updated", { action: parsed.action, at: now() });
+          }
+        }
+        sendJson(res, 200, { ok: true, result }, baseHeaders);
         return;
       }
 
-      // GDD Decision #5: Direct file upload endpoint (<= 5 MB, magic-byte validated)
+      /* ==================== Image Upload & Safe Serving ==================== */
+
       if (req.method === "POST" && pathname === "/api/upload") {
+        if (!checkRateLimit(ip, "upload", 30)) {
+          throw new RpcError(429, "Too many uploads. Please wait a minute.");
+        }
         const raw = await readBody(req, MAX_UPLOAD_BYTES + 1024);
         const saved = uploads.saveBuffer(raw);
-        sendJson(res, 200, { ok: true, imageUrl: saved.imageUrl, mime: saved.mime });
+        sendJson(res, 200, { ok: true, imageUrl: saved.imageUrl, mime: saved.mime }, baseHeaders);
         return;
       }
 
-      // Serve uploaded images safely
       if (req.method === "GET" && pathname.startsWith("/uploads/")) {
         let fileName: string;
         try {
           fileName = decodeURIComponent(pathname.slice("/uploads/".length));
         } catch {
-          sendJson(res, 400, { ok: false, error: "Malformed upload path." });
+          sendJson(res, 400, { ok: false, error: "Malformed upload path." }, baseHeaders);
           return;
         }
         const found = uploads.resolveSafeFile(fileName);
         if (!found) {
-          sendJson(res, 404, { ok: false, error: "Upload not found." });
+          sendJson(res, 404, { ok: false, error: "Upload not found." }, baseHeaders);
           return;
         }
         res.writeHead(200, {
+          ...baseHeaders,
           "content-type": found.mime,
-          "x-content-type-options": "nosniff",
           "cache-control": "public, max-age=31536000, immutable",
         });
         fs.createReadStream(found.fullPath).pipe(res);
         return;
       }
 
-      // Production static hosting: Handheld Simulator at /handheld/*
+      /* ==================== Static Frontend Hosting ==================== */
+
       if (req.method === "GET" && (pathname === "/handheld" || pathname.startsWith("/handheld/"))) {
         if (pathname === "/handheld") {
           res.writeHead(302, { location: "/handheld/" });
@@ -158,22 +561,21 @@ export function createAppServer(options: AppServerOptions) {
           return;
         }
         const rel = pathname.slice("/handheld/".length);
-        if (tryServeStatic(res, options.handheldDistDir, rel)) return;
+        if (tryServeStatic(res, options.handheldDistDir, rel, baseHeaders)) return;
       }
 
-      // Production static hosting: Web Companion at /*
       if (req.method === "GET") {
-        if (tryServeStatic(res, options.webDistDir, pathname)) return;
+        if (tryServeStatic(res, options.webDistDir, pathname, baseHeaders)) return;
       }
 
-      sendJson(res, 404, { ok: false, error: "Not found." });
+      sendJson(res, 404, { ok: false, error: "Not found." }, baseHeaders);
     } catch (err) {
       if (err instanceof RpcError) {
-        sendJson(res, err.status, { ok: false, error: err.message });
+        sendJson(res, err.status, { ok: false, error: err.message }, baseHeaders);
         return;
       }
       const message = err instanceof Error ? err.message : "Internal server error";
-      sendJson(res, 400, { ok: false, error: message });
+      sendJson(res, 400, { ok: false, error: message }, baseHeaders);
     }
   });
 
@@ -181,6 +583,18 @@ export function createAppServer(options: AppServerOptions) {
     server,
     close: () =>
       new Promise<void>((resolve) => {
+        clearInterval(sseHeartbeat);
+        for (const set of sseClients.values()) {
+          for (const client of set) {
+            try {
+              client.end();
+            } catch {
+              /* ignore */
+            }
+          }
+          set.clear();
+        }
+        sseClients.clear();
         server.close(() => {
           repo.close();
           resolve();

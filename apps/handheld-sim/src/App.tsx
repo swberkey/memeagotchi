@@ -16,7 +16,7 @@ import {
 } from "@memeagotchi/snes-games";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type PointerEvent } from "react";
-import { api } from "./api";
+import { api, claimPairCode, clearPairedDevice, getPairedDevice, type StoredPairedDevice } from "./api";
 import { Monster } from "./Monster";
 
 import imgDistracted from "./assets/meme-distracted.jpg";
@@ -354,13 +354,50 @@ function Burst({ kind, burstKey }: { kind: "hearts" | "sparkles"; burstKey: numb
 
 export function App() {
   const queryClient = useQueryClient();
+  const [pairedDevice, setPairedDevice] = useState<StoredPairedDevice | null>(() => getPairedDevice());
+  const [pairCodeInput, setPairCodeInput] = useState("");
+  const [sseLive, setSseLive] = useState(false);
+
   const pet = useQuery({
-    queryKey: ["gameState"],
-    queryFn: () => api.getState({}),
-    refetchInterval: 4000,
+    queryKey: ["gameState", pairedDevice?.deviceId ?? "local"],
+    queryFn: async () => {
+      try {
+        return await api.getState({});
+      } catch (err) {
+        // If paired device token was revoked remotely, fall back cleanly to local session
+        if (pairedDevice && err instanceof Error && err.message.toLowerCase().includes("revoked")) {
+          clearPairedDevice();
+          setPairedDevice(null);
+        }
+        throw err;
+      }
+    },
+    refetchInterval: 8000,
   });
   const view: GameView | undefined = pet.data?.view;
   const mon = view?.monster;
+
+  // Real-time Server-Sent Events (SSE) live sync stream
+  useEffect(() => {
+    if (typeof EventSource === "undefined") return;
+    const sseUrl = pairedDevice
+      ? `/api/events?deviceToken=${encodeURIComponent(pairedDevice.deviceToken)}`
+      : "/api/events";
+    const es = new EventSource(sseUrl);
+    const onConnected = () => setSseLive(true);
+    const onError = () => setSseLive(false);
+    const onUpdate = () => {
+      void queryClient.invalidateQueries({ queryKey: ["gameState"] });
+    };
+    es.addEventListener("connected", onConnected);
+    es.addEventListener("state_updated", onUpdate);
+    es.addEventListener("network_updated", onUpdate);
+    es.onerror = onError;
+    return () => {
+      setSseLive(false);
+      es.close();
+    };
+  }, [queryClient, pairedDevice]);
 
   const gameController = useMemo(() => createGamepadController(), []);
   const [hwPressed, setHwPressed] = useState<Readonly<Record<GamepadButton, boolean>>>(() => ({
@@ -533,12 +570,32 @@ export function App() {
 
   const applyResult = useCallback(
     (r: { ok: boolean; message: string; view: GameView }) => {
-      queryClient.setQueryData(["gameState"], { view: r.view });
+      queryClient.setQueryData(["gameState", pairedDevice?.deviceId ?? "local"], { view: r.view });
       if (r.message) setNotice(r.message);
       return r;
     },
-    [queryClient],
+    [queryClient, pairedDevice?.deviceId],
   );
+
+  const pairMut = useMutation({
+    mutationFn: (code: string) => claimPairCode(code, "MemeAgotchi-320 Handheld"),
+    onSuccess: (dev) => {
+      prevStage.current = null;
+      setInitRouted(false);
+      setMode("pet");
+      setPairedDevice(dev);
+      setPairCodeInput("");
+      setNotice(`🔗 Paired with ${dev.accountHandle}! Live cloud sync active.`);
+      showScreenMsg(`🔗 PAIRED TO ${dev.accountHandle.toUpperCase()}!`);
+      void queryClient.invalidateQueries({ queryKey: ["gameState"] });
+      blipOk();
+    },
+    onError: (err: Error) => {
+      setNotice(`⚠️ ${err.message}`);
+      showScreenMsg(err.message);
+      blipBad();
+    },
+  });
 
   const hatchMut = useMutation({
     mutationFn: (args: { species: SpeciesId; name: string }) => api.hatchStarter(args),
@@ -1265,8 +1322,8 @@ export function App() {
               <span className="font-game text-[10px] tracking-wider" style={{ color: shell.textMuted }}>
                 MEMEAGOTCHI-320
               </span>
-              <span className="hidden sm:inline font-mono text-[10px] font-bold opacity-75" style={{ color: shell.textMuted }}>
-                · ESP32-S3 · 320×240 IPS · {pttActive ? "🎙️ MIC PTT" : "LIVE SYNC"}
+              <span className="hidden sm:inline font-mono text-[10px] font-bold opacity-80" style={{ color: shell.textMuted }}>
+                · ESP32-S3 · 320×240 IPS · {pttActive ? "🎙️ MIC PTT" : pairedDevice ? `🔗 ${pairedDevice.accountHandle}` : sseLive ? "⚡ SSE LIVE" : "SYNC"}
               </span>
             </div>
             {/* Speaker grille */}
@@ -2300,6 +2357,69 @@ export function App() {
               📳 Motion
             </button>
           </div>
+        </section>
+
+        {/* Cloud Account Pairing Strip (6-Char ESP32-S3 Bearer Sync Protocol) */}
+        <section
+          aria-label="Cloud Account Device Pairing"
+          className="mt-3 flex w-full max-w-[880px] flex-wrap items-center justify-between gap-2 rounded-2xl border border-[var(--border)] bg-[var(--surface)]/90 px-4 py-2.5 text-xs shadow-lg"
+        >
+          {pairedDevice ? (
+            <>
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="inline-block h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399]" />
+                <span className="font-bold text-emerald-300">🔗 Paired to {pairedDevice.accountHandle}</span>
+                <span className="text-[var(--dim)] hidden sm:inline">· ESP32-S3 Bearer Sync + Real-Time SSE active</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  prevStage.current = null;
+                  setInitRouted(false);
+                  setMode("pet");
+                  clearPairedDevice();
+                  setPairedDevice(null);
+                  setNotice("Unpaired handheld — switched back to browser session.");
+                  void queryClient.invalidateQueries({ queryKey: ["gameState"] });
+                }}
+                className="rounded-full border border-rose-400/40 bg-rose-500/15 px-3 py-1 text-[11px] font-bold text-rose-200 hover:bg-rose-500/25"
+              >
+                Unpair Handheld
+              </button>
+            </>
+          ) : (
+            <>
+              <div className="min-w-0">
+                <span className="font-bold text-[#7be6d8]">🌐 Pair Handheld to Cloud Account</span>
+                <span className="ml-2 text-[var(--dim)]">
+                  Get a 6-character code from Companion → Online → Pair
+                </span>
+              </div>
+              <form
+                className="flex items-center gap-1.5"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (pairCodeInput.trim().length >= 6) pairMut.mutate(pairCodeInput.trim());
+                }}
+              >
+                <input
+                  aria-label="6-character pairing code"
+                  maxLength={8}
+                  value={pairCodeInput}
+                  onChange={(e) => setPairCodeInput(e.target.value.toUpperCase())}
+                  placeholder="6-CHAR CODE"
+                  className="w-28 rounded-xl border border-[var(--border)] bg-black/35 px-2.5 py-1 font-mono text-xs font-bold tracking-widest text-[#fde047] uppercase outline-none focus:border-[#7be6d8]"
+                />
+                <button
+                  type="submit"
+                  disabled={pairCodeInput.trim().length < 6 || pairMut.isPending}
+                  className="rounded-xl bg-[#7be6d8] px-3 py-1 text-[11px] font-extrabold text-[#141026] disabled:opacity-40"
+                >
+                  {pairMut.isPending ? "Pairing…" : "🔗 Pair"}
+                </button>
+              </form>
+            </>
+          )}
         </section>
 
         {/* Voice / URL Dock */}

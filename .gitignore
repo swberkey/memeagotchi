@@ -8,6 +8,7 @@ coverage/
 apps/server/data/*.db
 apps/server/data/*.db-shm
 apps/server/data/*.db-wal
+apps/server/data/.session-secret
 apps/server/data/uploads/*
 !apps/server/data/uploads/.gitkeep
 .DS_Store

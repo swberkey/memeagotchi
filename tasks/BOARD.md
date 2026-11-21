@@ -1,6 +1,6 @@
 # MemeAgotchi — Sprint Board & Multi-AI Handoffs
 
-## Current Phase: 320×240 (4:3 QVGA) Alignment & Stylistic UI Redesign Complete → Ready for Cloud Deployment / Grok Dialogue Pack / ESP32-S3 Hardware Build
+## Current Phase: Sprint 4 Complete (Online Multi-User Auth, 6-Char Handheld Pairing, Real-Time SSE, Community Memes, Leaderboard & Cloud Deploy Kit) → Ready for Live Cloud Deploy & ESP32-S3 Hardware Build
 
 ### Sprint 1 — Unified Core & Bug-Free Runtime (Completed · `7594ce9`)
 - [x] Initialize clean Git monorepo + `AGENTS.md` / `CLAUDE.md` / contracts / ADRs
@@ -31,9 +31,17 @@
   - **Handheld Simulator (`apps/handheld-sim`):** 4 live switchable hardware shell colorways (`Obsidian`, `Atomic Purple`, `Mint Cream`, `Retro SNES`), flush 4:3 glass lens, recessed D-Pad well, direct mouse/touch clickability across all screens (5×2 visual app launcher grid, Pet bottom quick-action dock, clickable vibe pills & stat tabs), `▲` Full-Screen `320×240` Meme Feed, and Sleep Meme Dream Screensaver + Light/Sound/Motion wake sensors.
   - **Web Companion (`apps/web-companion`):** `Plus Jakarta Sans` + `Silkscreen` typography, species-tinted habitat card, 4:3 Sleep Dream Screensaver, floating glass pill bottom nav with Belly badge, unified 3-tab lower drawer (`Pulse` / `Secrets` / `Pet Options`), dark-glass harmonized Feed cards, and `320×240` 4:3 SNES Arcade.
 
-### Sprint 4 — Next Up (Content Polish, Cloud Deployment & Hardware Build)
+### Sprint 4 — Putting the Online Pieces Together (Completed)
+- [x] **Multi-User Accounts & Security (`apps/server/src/auth.ts`, `db.ts`):** Per-user SQLite saves (`user_pets`), `@handle` + `scrypt` password auth, HMAC-SHA256 signed `HttpOnly` session cookies (`mg_session`), seamless Guest fallback & legacy DB migration, per-IP rate limiting, and security/CORS headers.
+- [x] **6-Character Handheld Device Pairing (`/api/devices/*`):** One-click 6-char pair code generation in Web Companion → single-use claim returning SHA-256-hashed Bearer `deviceToken` (`mgd_...`) for the `320×240` Handheld Simulator & future ESP32-S3 Wi-Fi firmware, plus instant remote Unpair revocation.
+- [x] **Real-Time Live Sync (`/api/events` SSE):** Zero-dependency Server-Sent Events hub broadcasting `state_updated`, `network_updated`, and `device_paired` instantly across Web Companion and paired handhelds.
+- [x] **Shared Online Meme Network & Global Leaderboard:** Community `network_memes` cross-account sharing + live `/api/leaderboard` ranked by XP, Care Streak, and all 3 SNES Arcade high scores (`OnlineHubModal` in Companion).
+- [x] **Cloud Deploy Kit & PWA:** Added `render.yaml`, `fly.toml`, `railway.json`, `.env.example`, `apps/web-companion/public/manifest.webmanifest`, and [docs/online-deployment.md](../docs/online-deployment.md).
+- [x] **Verification:** Expanded `apps/server/src/server.test.ts` with end-to-end multi-user, pairing, revocation, community meme, leaderboard, and SSE live-push tests (**20/20 tests passing**).
+
+### Sprint 5 — Next Up (Live Cloud Launch, Grok Content Pack & ESP32-S3 Hardware Build)
+- [ ] Click Deploy on Railway / Render / Fly.io using `swberkey/memeagotchi` (`docs/online-deployment.md`) and test mobile PWA + live multiplayer!
 - [ ] Grok session (GDD §5.3 Prompt 0.2): finalize 5 reserve secret words & expand all 5 starter species' Muse voice dialogue packs
-- [ ] Cloud deployment: deploy via `Dockerfile` (Railway/Render/Fly.io) or add Supabase Auth + Postgres + Storage adapter (GDD §8) + Capacitor Android wrap
 - [ ] Hardware Phase 1 breadboard: wire ESP32-S3-N16R8 (or Waveshare ESP32-S3 2" LCD Board) + 2.0" ST7789VW `320×240` SPI display + 7 tactile switches (D-Pad + `O`/`X`/`--`) + INMP441/MAX98357A audio + LIS3DH/BH1750 carry wake sensors and port `packages/game-core` to C/C++ verified against golden unit-test vectors
 
 ---
@@ -49,4 +57,10 @@
 ### 2026-11-21 — Sprint 3 280×240 Alignment, 5 Starters, Title Screen & 3 SNES Games (Antigravity)
 - **Changed:** Added `docs/decisions/ADR-002-handheld-280x240-roster-games.md`, 4 new species concept sheets in `docs/art/`, engine v3 + server RPCs (`hatchStarter`, `runner`/`blaster`/`beat`, care streak, high scores, 5/15/30 milestone powers), 5-species `@memeagotchi/monster-ui`, new `@memeagotchi/snes-games` package, Web Companion Title/Starter Picker & SNES Arcade, and Landscape `280×240` Handheld Simulator rebuild.
 - **Verification:** `npm run check` passed with exit code 0 across all 7 workspaces (`tsc --noEmit`, 18/18 tests, Vite + server production builds). Browser visual QA verified both `http://localhost:3000/` and `http://localhost:3000/handheld/` with 0 console errors and 0 failed HTTP requests.
-- **Next Step:** Ready for Sprint 4 — online deployment (`Dockerfile` / Railway / Fly.io or Supabase + Android), Grok dialogue expansion across all 5 species, or ESP32-S3 + 1.69" ST7789V2 hardware breadboard firmware port.
+### 2026-11-21 — Sprint 3.5 `320×240` (4:3 QVGA) Standardization & Stylistic UI Redesign (`fc98776`)
+- **Changed:** Standardized display geometry to `320×240` (4:3 QVGA, 2.0" ST7789VW / 2.4" ILI9341 IPS) in `ADR-003`, all docs, and all 3 SNES games; redesigned Handheld Simulator (4 shell colorways, 5×2 app launcher grid, clickable controls) and Web Companion (`Plus Jakarta Sans` + `Silkscreen`, species-tinted habitat, floating pill nav, 3-tab drawer).
+
+### 2026-11-21 — Sprint 4 Putting the Online Pieces Together (Antigravity)
+- **Changed:** Multi-user accounts (`scrypt` + signed `HttpOnly` cookie sessions), isolated per-user SQLite saves (`user_pets`), 6-char ESP32-S3/Handheld pairing codes & revocable SHA-256 Bearer `mgd_...` tokens, real-time SSE hub (`/api/events`), cross-account community memes (`network_memes`), live Global Leaderboard (`/api/leaderboard`), Web Companion `OnlineHubModal` + PWA `manifest.webmanifest`, Handheld Cloud Pairing bar, and deploy manifests (`render.yaml`, `fly.toml`, `railway.json`, `.env.example`, `docs/online-deployment.md`).
+- **Verification:** `npm run check` passed across all 7 workspaces (`tsc --noEmit`, 20/20 unit + HTTP/SSE integration tests, Vite + server production builds).
+- **Next Step:** Deploy live on Railway/Render/Fly.io using `docs/online-deployment.md`, run Grok dialogue pack session, and begin ESP32-S3 `320×240` hardware breadboard firmware.

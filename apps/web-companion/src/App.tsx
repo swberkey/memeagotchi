@@ -12,8 +12,9 @@ import { CosmeticBadge, DreamScreensaver, MemeMonster, type DreamSlide } from "@
 import { ArcadeGamepad, SnesArcadeCanvas, createGamepadController } from "@memeagotchi/snes-games";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { api, uploadMemeFile } from "./api";
+import { api, fetchAuthMe, uploadMemeFile } from "./api";
 import { MonsterSVG } from "./components/MonsterSVG";
+import { OnlineHubModal } from "./components/OnlineHubModal";
 import { TitleHatchScreen } from "./components/TitleHatchScreen";
 import { MEME_IMAGES, MEME_TEMPLATES, resolveMemeImage } from "./memeImages";
 import { sfx } from "./sound";
@@ -95,6 +96,8 @@ export function App() {
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [showTitle, setShowTitle] = useState(false);
+  const [onlineOpen, setOnlineOpen] = useState(false);
+  const [liveConnected, setLiveConnected] = useState(false);
   const [homeDrawer, setHomeDrawer] = useState<"activity" | "secrets" | "options">("activity");
   const [game, setGame] = useState<MiniGameId | null>("runner");
   const [gameResultBanner, setGameResultBanner] = useState("");
@@ -138,10 +141,40 @@ export function App() {
     toastTimerRef.current = setTimeout(() => setToast(""), 4500);
   }, []);
 
+  const authQuery = useQuery({
+    queryKey: ["authMe"],
+    queryFn: fetchAuthMe,
+    refetchInterval: 30000,
+  });
+  const activeUser = authQuery.data?.actor.user ?? null;
+
+  // Real-time Server-Sent Events (SSE) live sync across devices & online community
+  useEffect(() => {
+    if (typeof EventSource === "undefined") return;
+    const es = new EventSource("/api/events");
+    const onOpen = () => setLiveConnected(true);
+    const onErr = () => setLiveConnected(false);
+    const onSync = () => {
+      void qc.invalidateQueries({ queryKey: ["gameState"] });
+    };
+    const onDevice = () => {
+      void qc.invalidateQueries({ queryKey: ["authMe"] });
+    };
+    es.addEventListener("connected", onOpen);
+    es.addEventListener("state_updated", onSync);
+    es.addEventListener("network_updated", onSync);
+    es.addEventListener("device_paired", onDevice);
+    es.onerror = onErr;
+    return () => {
+      setLiveConnected(false);
+      es.close();
+    };
+  }, [qc, activeUser?.id]);
+
   const stateQuery = useQuery({
     queryKey: ["gameState"],
     queryFn: () => api.getState({}),
-    refetchInterval: 5000,
+    refetchInterval: 8000,
   });
 
   const view: GameView | undefined = stateQuery.data?.view;
@@ -387,15 +420,31 @@ export function App() {
 
   if (!view.hatched || showTitle) {
     return (
-      <TitleHatchScreen
-        view={view}
-        handheldUrl={HANDHELD_URL}
-        hatching={hatchMut.isPending}
-        onContinue={() => setShowTitle(false)}
-        onHatch={(species, name) => hatchMut.mutate({ species, name })}
-        onToggleClock={() => settingsMut.mutate({ clock: view.settings.clock === 60 ? 1 : 60 })}
-        onToggleSound={() => settingsMut.mutate({ soundOn: !soundOn })}
-      />
+      <>
+        <TitleHatchScreen
+          view={view}
+          handheldUrl={HANDHELD_URL}
+          accountLabel={activeUser ? `@${activeUser.handle}` : "Online / Sign In"}
+          hatching={hatchMut.isPending}
+          onContinue={() => setShowTitle(false)}
+          onHatch={(species, name) => hatchMut.mutate({ species, name })}
+          onToggleClock={() => settingsMut.mutate({ clock: view.settings.clock === 60 ? 1 : 60 })}
+          onToggleSound={() => settingsMut.mutate({ soundOn: !soundOn })}
+          onOpenOnline={() => setOnlineOpen(true)}
+        />
+        {onlineOpen && (
+          <OnlineHubModal
+            liveConnected={liveConnected}
+            onClose={() => setOnlineOpen(false)}
+            onNotify={showToast}
+          />
+        )}
+        {toast && (
+          <div className="fixed bottom-4 left-1/2 z-[60] -translate-x-1/2 rounded-full border border-[var(--accent)]/60 bg-[#141026]/95 px-4 py-2 text-xs font-bold text-[#7be6d8] shadow-2xl">
+            {toast}
+          </div>
+        )}
+      </>
     );
   }
 
@@ -457,6 +506,15 @@ export function App() {
               title="Title Screen / Switch Starter"
             >
               🏠 Title
+            </button>
+            <button
+              type="button"
+              onClick={() => setOnlineOpen(true)}
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[var(--accent)]/15 border border-[var(--accent)]/45 text-[11px] font-bold text-[var(--accent)] hover:bg-[var(--accent)]/25"
+              title="Cloud Account, Handheld Pairing & Global Leaderboard"
+            >
+              <span className={`h-1.5 w-1.5 rounded-full ${liveConnected ? "bg-emerald-400" : "bg-amber-400"}`} />
+              <span className="truncate max-w-[90px]">{activeUser ? `@${activeUser.handle}` : "Online"}</span>
             </button>
             <button
               type="button"
@@ -1572,6 +1630,14 @@ export function App() {
             ))}
           </div>
         </main>
+      )}
+
+      {onlineOpen && (
+        <OnlineHubModal
+          liveConnected={liveConnected}
+          onClose={() => setOnlineOpen(false)}
+          onNotify={showToast}
+        />
       )}
 
       {/* Floating Glass Pill Bottom Nav */}

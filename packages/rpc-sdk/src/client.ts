@@ -11,14 +11,27 @@ export type ActionClient<TMod extends ActionsModule<any>> = {
 export type ApiRequest<TClient, K extends keyof TClient> = TClient[K] extends (args: infer A) => any ? A : never;
 export type ApiResponse<TClient, K extends keyof TClient> = TClient[K] extends (...args: any[]) => Promise<infer R> ? R : never;
 
-export function createActionClient<TMod extends ActionsModule<any>>(endpoint = "/api/actions"): ActionClient<TMod> {
+export interface ActionClientOptions {
+  getHeaders?: () => Record<string, string>;
+  credentials?: RequestCredentials;
+}
+
+export function createActionClient<TMod extends ActionsModule<any>>(
+  endpoint = "/api/actions",
+  options?: ActionClientOptions,
+): ActionClient<TMod> {
   return new Proxy({} as ActionClient<TMod>, {
     get(_target, prop) {
       if (typeof prop !== "string") return undefined;
       return async (args: unknown) => {
+        const extraHeaders = options?.getHeaders ? options.getHeaders() : {};
         const res = await fetch(endpoint, {
           method: "POST",
-          headers: { "content-type": "application/json" },
+          credentials: options?.credentials ?? "same-origin",
+          headers: {
+            "content-type": "application/json",
+            ...extraHeaders,
+          },
           body: JSON.stringify({ action: prop, args: args ?? {} }),
         });
         const text = await res.text();
