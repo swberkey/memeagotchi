@@ -1274,6 +1274,48 @@ export function toGameView(s: GameState, nowMs: number, notes: string[] = []): G
     })
     .filter((x): x is NonNullable<typeof x> => x !== null);
 
+  // Build unique list of memes the monster has fed on (in belly + digested history), newest first
+  const dreamSeen = new Set<string>();
+  const dreamMemes: GameView["dreamMemes"] = [];
+  const bellySorted = [...s.belly].sort((a, b) => b.fedAtReal - a.fedAtReal);
+  for (const b of bellySorted) {
+    if (dreamSeen.has(b.memeKey)) continue;
+    const meme = s.memes.find((m) => (m.id === b.memeId || m.key === b.memeKey) && !m.hidden);
+    if (!meme) continue;
+    dreamSeen.add(b.memeKey);
+    dreamMemes.push({
+      memeId: meme.id,
+      memeKey: meme.key,
+      title: meme.title,
+      caption: meme.caption,
+      emoji: meme.emoji,
+      imageKey: meme.imageKey,
+      imageUrl: meme.imageUrl,
+      bg: meme.bg,
+      fedAtReal: b.fedAtReal,
+      inBelly: true,
+    });
+  }
+  const digestedSorted = [...s.digestedHistory].sort((a, b) => b.digestedAtReal - a.digestedAtReal);
+  for (const d of digestedSorted) {
+    if (dreamSeen.has(d.memeKey)) continue;
+    const meme = s.memes.find((m) => (m.id === d.memeId || m.key === d.memeKey) && !m.hidden);
+    if (!meme) continue;
+    dreamSeen.add(d.memeKey);
+    dreamMemes.push({
+      memeId: meme.id,
+      memeKey: meme.key,
+      title: meme.title,
+      caption: meme.caption,
+      emoji: meme.emoji,
+      imageKey: meme.imageKey,
+      imageUrl: meme.imageUrl,
+      bg: meme.bg,
+      fedAtReal: d.digestedAtReal,
+      inBelly: false,
+    });
+  }
+
   return {
     hatched: s.hatched,
     speciesCatalog: SPECIES_CATALOG,
@@ -1345,6 +1387,7 @@ export function toGameView(s: GameState, nowMs: number, notes: string[] = []): G
         powerNow: meme ? memePower(meme, s.gameMs) : b.powerAtFed,
       };
     }),
+    dreamMemes,
     memes: visibleMemes,
     bonusMemes: BONUS_MEMES.map((b) => ({
       key: b.key,

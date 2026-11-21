@@ -8,7 +8,7 @@ import {
   type Mood,
   type SpeciesId,
 } from "@memeagotchi/game-core";
-import { CosmeticBadge, StarterEgg } from "@memeagotchi/monster-ui";
+import { CosmeticBadge, DreamScreensaver, StarterEgg, type DreamSlide } from "@memeagotchi/monster-ui";
 import {
   SnesArcadeCanvas,
   createGamepadController,
@@ -360,6 +360,10 @@ export function App() {
   const [gameMsg, setGameMsg] = useState("");
   const [talkText, setTalkText] = useState("");
   const [pttActive, setPttActive] = useState(false);
+  const [feedFullscreen, setFeedFullscreen] = useState(false);
+  const [sleepStandby, setSleepStandby] = useState(false);
+  const [sensorWakeBadge, setSensorWakeBadge] = useState<string | null>(null);
+  const [dreamSlideIdx, setDreamSlideIdx] = useState<number | undefined>(undefined);
   const [resetArm, setResetArm] = useState(false);
   const [flash, setFlash] = useState(0);
   const [tickNow, setTickNow] = useState(() => Date.now());
@@ -368,11 +372,16 @@ export function App() {
   const prevStage = useRef<number | null>(null);
   const modeRef = useRef(mode);
   modeRef.current = mode;
+  const feedFullscreenRef = useRef(feedFullscreen);
+  feedFullscreenRef.current = feedFullscreen;
+  const sleepStandbyRef = useRef(sleepStandby);
+  sleepStandbyRef.current = sleepStandby;
   const navRef = useRef(nav);
   navRef.current = nav;
   const viewRef = useRef(view);
   viewRef.current = view;
   const screenMsgTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const sensorBadgeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const resetArmTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pttHoldTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pttFiredRef = useRef(false);
@@ -404,7 +413,17 @@ export function App() {
       setResetArm(false);
       if (resetArmTimer.current) clearTimeout(resetArmTimer.current);
     }
-  }, [mode, resetArm]);
+    if (mode !== "feed" && feedFullscreen) {
+      setFeedFullscreen(false);
+    }
+  }, [mode, resetArm, feedFullscreen]);
+
+  useEffect(() => {
+    if (!mon?.isSleeping) {
+      setSleepStandby(false);
+      setDreamSlideIdx(undefined);
+    }
+  }, [mon?.isSleeping]);
 
   useEffect(() => {
     if (!burst) return;
@@ -421,9 +440,16 @@ export function App() {
   useEffect(() => {
     return () => {
       if (screenMsgTimer.current) clearTimeout(screenMsgTimer.current);
+      if (sensorBadgeTimer.current) clearTimeout(sensorBadgeTimer.current);
       if (resetArmTimer.current) clearTimeout(resetArmTimer.current);
       if (pttHoldTimer.current) clearTimeout(pttHoldTimer.current);
     };
+  }, []);
+
+  const flashSensorBadge = useCallback((badge: string) => {
+    setSensorWakeBadge(badge);
+    if (sensorBadgeTimer.current) clearTimeout(sensorBadgeTimer.current);
+    sensorBadgeTimer.current = setTimeout(() => setSensorWakeBadge(null), 3200);
   }, []);
 
   const showScreenMsg = useCallback((text: string) => {
@@ -607,8 +633,23 @@ export function App() {
       const n = navRef.current;
       const curMode = modeRef.current;
 
-      // Sleeping pet wakes on O or --
+      // Sleeping pet: standby wakes into Dream Screensaver on any press; active Dream Saver browses with ◄► and wakes pet on O or --
       if (v.monster.isSleeping && curMode === "pet") {
+        if (sleepStandbyRef.current) {
+          setSleepStandby(false);
+          flashSensorBadge("📳 MOTION WAKE");
+          blipNav();
+          return;
+        }
+        if (btn === "left" || btn === "right") {
+          const total = Math.max(1, v.dreamMemes.length > 0 ? v.dreamMemes.length : Math.min(4, v.memes.length));
+          setDreamSlideIdx((prev) => {
+            const cur = prev ?? 0;
+            return (cur + (btn === "right" ? 1 : total - 1)) % total;
+          });
+          blipNav();
+          return;
+        }
         if (btn === "o" || btn === "menu") {
           careMut.mutate("sleep");
           blipOk();
@@ -722,15 +763,44 @@ export function App() {
 
       if (curMode === "feed") {
         const memeLen = Math.max(1, v.memes.length);
+        if (btn === "up") {
+          blipNav();
+          setFeedFullscreen((f) => !f);
+          return;
+        }
+        if (feedFullscreenRef.current) {
+          if (btn === "left") {
+            blipNav();
+            patchNav({ meme: (n.meme + memeLen - 1) % memeLen });
+          } else if (btn === "right") {
+            blipNav();
+            patchNav({ meme: (n.meme + 1) % memeLen });
+          } else if (btn === "down") {
+            blipNav();
+            patchNav({ label: (n.label + 1) % LABELS.length });
+          } else if (btn === "o") {
+            const meme = v.memes[n.meme % memeLen];
+            const label = LABELS[n.label % LABELS.length];
+            if (meme && label) {
+              setFlash(Date.now());
+              feedMut.mutate({ memeKey: meme.key, label });
+            }
+          } else if (btn === "x") {
+            blipNav();
+            setFeedFullscreen(false);
+          } else if (btn === "menu") {
+            blipNav();
+            setFeedFullscreen(false);
+            setMode("menu");
+          }
+          return;
+        }
         if (btn === "left") {
           blipNav();
           patchNav({ label: (n.label + LABELS.length - 1) % LABELS.length });
         } else if (btn === "right") {
           blipNav();
           patchNav({ label: (n.label + 1) % LABELS.length });
-        } else if (btn === "up") {
-          blipNav();
-          patchNav({ meme: (n.meme + memeLen - 1) % memeLen });
         } else if (btn === "down") {
           blipNav();
           patchNav({ meme: (n.meme + 1) % memeLen });
@@ -927,6 +997,7 @@ export function App() {
       resetMut,
       gameBlock,
       showScreenMsg,
+      flashSensorBadge,
       resetArm,
     ],
   );
@@ -1058,6 +1129,44 @@ export function App() {
   const hourNow = new Date().getHours();
   const tod: Tod = hourNow >= 7 && hourNow < 17 ? "day" : hourNow >= 17 && hourNow < 21 ? "evening" : "night";
   const screenKey = mon ? `${mode}-${mon.isSleeping ? "zzz" : "awake"}` : "boot";
+
+  const hasFedMemes = (view?.dreamMemes.length ?? 0) > 0;
+  const dreamSlides: DreamSlide[] = useMemo(() => {
+    if (!view) return [];
+    const source = view.dreamMemes.length > 0 ? view.dreamMemes : view.memes.slice(0, 4);
+    return source.map((m) => {
+      const key = "memeKey" in m ? m.memeKey : m.key;
+      const src = m.imageUrl ?? (m.imageKey ? MEME_IMG[m.imageKey] : undefined) ?? MEME_IMG[key] ?? null;
+      return {
+        id: "memeId" in m ? m.memeId : m.id,
+        title: m.title,
+        emoji: m.emoji,
+        bg: m.bg,
+        src,
+      };
+    });
+  }, [view]);
+
+  const triggerAmbientSensor = useCallback(
+    (kind: "light" | "sound" | "motion") => {
+      const badge =
+        kind === "light"
+          ? "☀️ LIGHT WAKE"
+          : kind === "sound"
+            ? "🎙️ SOUND WAKE"
+            : "📳 MOTION WAKE";
+      if (!viewRef.current?.monster.isSleeping) {
+        setMode("pet");
+        careMut.mutate("sleep");
+      } else {
+        setMode("pet");
+      }
+      setSleepStandby(false);
+      flashSensorBadge(badge);
+      blipOk();
+    },
+    [careMut, flashSensorBadge, blipOk],
+  );
 
   return (
     <div className="min-h-screen bg-[var(--bg)] text-[var(--text)]">
@@ -1296,17 +1405,23 @@ export function App() {
                         <ScreenText className="text-center text-[13px] opacity-85">◄►: SPECIES · O: HATCH! · X: BACK</ScreenText>
                       </div>
                     ) : mon.isSleeping && mode === "pet" ? (
-                      <div className="relative flex h-full flex-col items-center px-2.5 pb-2 pt-2.5">
-                        <SceneBg tod="night" />
-                        <div className="anim-breathe relative mt-1 h-[66%] aspect-square opacity-95">
-                          <Monster species={mon.species} stage={mon.displayStage} actualStage={mon.stage} mood="sleeping" equipped={view.equippedItems} />
-                        </div>
-                        <span className="anim-zzz font-game absolute right-[12%] top-[10%] text-[18px] text-[#ffd23f]">Z z z</span>
-                        <div className="snes-bar relative mt-auto w-full px-3 py-1.5 text-center">
-                          <p className="font-game text-[10px] leading-relaxed text-white">SLEEPING… ENERGY {mon.energy}%</p>
-                          <p className="font-pixel text-[14px] leading-none text-white/80">PRESS O OR -- TO WAKE</p>
-                        </div>
-                      </div>
+                      <DreamScreensaver
+                        species={mon.species}
+                        stage={mon.displayStage}
+                        petName={mon.name}
+                        energy={mon.energy}
+                        slides={dreamSlides}
+                        fromFedHistory={hasFedMemes}
+                        manualIndex={dreamSlideIdx}
+                        sensorBadge={sensorWakeBadge}
+                        standby={sleepStandby}
+                        wakeHint="O / -- : WAKE"
+                        onWakeFromStandby={() => {
+                          setSleepStandby(false);
+                          flashSensorBadge("📳 MOTION WAKE");
+                          blipNav();
+                        }}
+                      />
                     ) : mode === "menu" ? (
                       <div className="snes-dots flex h-full flex-col gap-1.5 p-2.5" style={{ background: "linear-gradient(180deg,#23235e 0%,#10102e 100%)" }}>
                         <Banner title="MAIN MENU" right={<span className="font-game text-[10px]">💧{mon.drip}</span>} />
@@ -1328,49 +1443,119 @@ export function App() {
                         <ScreenText className="text-center text-[13px] opacity-80">D-PAD: MOVE · O: OPEN · X: BACK</ScreenText>
                       </div>
                     ) : mode === "feed" && currentMeme ? (
-                      /* LANDSCAPE SPLIT FEED SCREEN */
-                      <div className="snes-dots flex h-full flex-col gap-1.5 p-2" style={{ background: "linear-gradient(180deg,#23235e 0%,#10102e 100%)" }}>
-                        <Banner
-                          title={`FEED ${(nav.meme % memeCount) + 1}/${view.memes.length}`}
-                          right={<span className="font-pixel text-[14px]">🫃 {view.belly.length}/{mon.memeSlots}</span>}
-                        />
-                        <div className="grid flex-1 min-h-0 grid-cols-[46%_1fr] gap-2">
-                          <div className="relative overflow-hidden rounded-lg border-[3px] border-[#0a0a24] bg-black">
-                            {memeSrc ? (
-                              <img src={memeSrc} alt={currentMeme.caption} className="pixelated h-full w-full object-cover" draggable={false} />
-                            ) : (
-                              <div className="flex h-full w-full items-center justify-center text-4xl" style={{ background: currentMeme.bg }}>
-                                {currentMeme.emoji}
-                              </div>
-                            )}
-                          </div>
-                          <div className="snes-window flex flex-col justify-between p-2">
-                            <div>
-                              <p className="font-game line-clamp-2 text-[9.5px] leading-snug text-white">
-                                {currentMeme.title.toUpperCase()}
-                              </p>
-                              <p className="font-pixel mt-1 text-[15px] text-[#ffd23f]">
-                                PWR {currentMeme.power} · ♥{currentMeme.tasty} 🌶{currentMeme.spicy} 🤢{currentMeme.blech}
-                              </p>
+                      feedFullscreen ? (
+                        /* FULL-SCREEN 280x240 MEME FEED VIEW (toggled via ▲ Up Arrow) */
+                        <div className="relative h-full w-full overflow-hidden bg-black">
+                          {memeSrc ? (
+                            <img
+                              src={memeSrc}
+                              alt={currentMeme.caption}
+                              className="h-full w-full object-cover"
+                              draggable={false}
+                            />
+                          ) : (
+                            <div
+                              className="flex h-full w-full items-center justify-center text-6xl"
+                              style={{ background: currentMeme.bg }}
+                            >
+                              {currentMeme.emoji}
                             </div>
-                            <div className="text-center">
-                              <div className="flex items-center justify-center gap-1.5">
-                                <span className="text-[#ffd23f]">◀</span>
-                                <span
-                                  className="font-game border-2 border-[#0a0a24] px-2 py-1 text-[9.5px] text-white"
-                                  style={{ background: LABEL_COLOR[currentLabel] }}
-                                >
-                                  {LABEL_FACE[currentLabel]}
-                                </span>
-                                <span className="text-[#ffd23f]">▶</span>
+                          )}
+
+                          {/* Subtle top index & title badge */}
+                          <div className="pointer-events-none absolute inset-x-2 top-1.5 flex items-center justify-between gap-2">
+                            <span
+                              className="max-w-[74%] truncate rounded-full px-2.5 py-0.5 font-mono text-[9.5px] font-bold text-white"
+                              style={{ background: "rgba(10, 10, 32, 0.78)" }}
+                            >
+                              {currentMeme.title}
+                            </span>
+                            <span
+                              className="shrink-0 rounded-full px-2 py-0.5 font-mono text-[9px] font-bold text-[#ffd23f]"
+                              style={{ background: "rgba(10, 10, 32, 0.78)" }}
+                            >
+                              {(nav.meme % memeCount) + 1}/{view.memes.length}
+                            </span>
+                          </div>
+
+                          {/* Minimal bottom control bar so meme dominates screen */}
+                          <div
+                            className="absolute inset-x-2 bottom-1.5 flex items-center justify-between gap-1.5 rounded-lg px-2 py-1"
+                            style={{ background: "rgba(10, 10, 32, 0.82)", border: "1px solid rgba(255,255,255,0.18)" }}
+                          >
+                            <span
+                              className="rounded px-1.5 py-0.5 font-game text-[8px] text-white"
+                              style={{ background: LABEL_COLOR[currentLabel] }}
+                            >
+                              {LABEL_FACE[currentLabel]}
+                            </span>
+                            <span className="font-mono text-[8.5px] font-bold text-white/90">
+                              ◄► MEME · ▼ VIBE · O FEED · ▲ EXIT
+                            </span>
+                          </div>
+                        </div>
+                      ) : (
+                        /* LANDSCAPE SPLIT FEED SCREEN */
+                        <div className="snes-dots flex h-full flex-col gap-1.5 p-2" style={{ background: "linear-gradient(180deg,#23235e 0%,#10102e 100%)" }}>
+                          <Banner
+                            title={`FEED ${(nav.meme % memeCount) + 1}/${view.memes.length}`}
+                            right={<span className="font-pixel text-[14px]">🫃 {view.belly.length}/{mon.memeSlots}</span>}
+                          />
+                          <div className="grid flex-1 min-h-0 grid-cols-[46%_1fr] gap-2">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                blipNav();
+                                setFeedFullscreen(true);
+                              }}
+                              title="Press ▲ Up Arrow for Full Screen Meme"
+                              className="relative overflow-hidden rounded-lg border-[3px] border-[#0a0a24] bg-black text-left"
+                            >
+                              {memeSrc ? (
+                                <img src={memeSrc} alt={currentMeme.caption} className="pixelated h-full w-full object-cover" draggable={false} />
+                              ) : (
+                                <div className="flex h-full w-full items-center justify-center text-4xl" style={{ background: currentMeme.bg }}>
+                                  {currentMeme.emoji}
+                                </div>
+                              )}
+                              <span
+                                className="absolute bottom-1 right-1 rounded px-1.5 py-0.5 font-mono text-[8px] font-bold text-[#ffd23f]"
+                                style={{ background: "rgba(10, 10, 32, 0.85)" }}
+                              >
+                                ▲ FULL
+                              </span>
+                            </button>
+                            <div className="snes-window flex flex-col justify-between p-2">
+                              <div>
+                                <p className="font-game line-clamp-2 text-[9.5px] leading-snug text-white">
+                                  {currentMeme.title.toUpperCase()}
+                                </p>
+                                <p className="font-pixel mt-1 text-[15px] text-[#ffd23f]">
+                                  PWR {currentMeme.power} · ♥{currentMeme.tasty} 🌶{currentMeme.spicy} 🤢{currentMeme.blech}
+                                </p>
                               </div>
-                              <p className="font-pixel mt-1 text-[13px] text-white/85">
-                                ▲▼ MEME · ◄► LABEL · O FEED
-                              </p>
+                              <div className="text-center">
+                                <div className="flex items-center justify-center gap-1.5">
+                                  <span className="text-[#ffd23f]">◀</span>
+                                  <span
+                                    className="font-game border-2 border-[#0a0a24] px-2 py-1 text-[9.5px] text-white"
+                                    style={{ background: LABEL_COLOR[currentLabel] }}
+                                  >
+                                    {LABEL_FACE[currentLabel]}
+                                  </span>
+                                  <span className="text-[#ffd23f]">▶</span>
+                                </div>
+                                <p className="font-pixel mt-1 text-[12px] text-[#7be6d8]">
+                                  ▲ FULLSCREEN · ▼ NEXT
+                                </p>
+                                <p className="font-pixel text-[12px] text-white/85">
+                                  ◄► LABEL · O FEED
+                                </p>
+                              </div>
                             </div>
                           </div>
                         </div>
-                      </div>
+                      )
                     ) : mode === "care" ? (
                       <div className="snes-dots flex h-full flex-col gap-1.5 p-2.5" style={{ background: "linear-gradient(180deg,#23235e 0%,#10102e 100%)" }}>
                         <Banner title="CARE" />
@@ -1747,9 +1932,61 @@ export function App() {
           </div>
 
           <p className="mt-3 text-center text-[11px] text-[#8f8da3]">
-            Keyboard: <b>Arrows/WASD</b> D-Pad · <b>Z/Space/Enter</b> = O · <b>X/Backspace</b> = X · <b>Esc/P</b> = -- Menu/Pause
+            Keyboard: <b>Arrows/WASD</b> D-Pad (<b>▲</b> Fullscreen in Feed) · <b>Z/Space/Enter</b> = O · <b>X/Backspace</b> = X · <b>Esc/P</b> = -- Menu
           </p>
         </div>
+
+        {/* Always-On Carry Hardware Wake Sensor Simulator (Light / Sound / Motion -> Meme Dream Screensaver) */}
+        <section
+          aria-label="Ambient Carry Wake Sensors"
+          className="mt-3 flex w-full max-w-[820px] flex-wrap items-center justify-between gap-2 rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-3.5 py-2.5 text-xs"
+        >
+          <div className="min-w-0">
+            <span className="font-bold text-[#ffd23f]">💭 Sleep Meme Dream Saver</span>
+            <span className="ml-2 text-[var(--dim)]">
+              Auto-wakes display on Light, Sound, or Motion ({view?.dreamMemes.length ?? 0} fed memes in dream reel)
+            </span>
+          </div>
+          <div className="flex flex-wrap items-center gap-1.5">
+            {mon?.isSleeping && (
+              <button
+                type="button"
+                onClick={() => setSleepStandby((s) => !s)}
+                className={`rounded-full border px-2.5 py-1 text-[11px] font-bold ${
+                  sleepStandby
+                    ? "border-slate-500 bg-slate-800 text-slate-200"
+                    : "border-[var(--border)] bg-black/30 text-[var(--dim)] hover:text-white"
+                }`}
+              >
+                {sleepStandby ? "🌑 In Standby" : "🌑 Dim Standby"}
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => triggerAmbientSensor("light")}
+              className="rounded-full border border-amber-400/40 bg-amber-400/15 px-2.5 py-1 text-[11px] font-bold text-amber-200 hover:bg-amber-400/25"
+              title="Simulate Ambient Light Sensor wake into Meme Dream Screensaver"
+            >
+              ☀️ Light
+            </button>
+            <button
+              type="button"
+              onClick={() => triggerAmbientSensor("sound")}
+              className="rounded-full border border-teal-400/40 bg-teal-400/15 px-2.5 py-1 text-[11px] font-bold text-teal-200 hover:bg-teal-400/25"
+              title="Simulate I2S Mic Sound wake into Meme Dream Screensaver"
+            >
+              🎙️ Sound
+            </button>
+            <button
+              type="button"
+              onClick={() => triggerAmbientSensor("motion")}
+              className="rounded-full border border-violet-400/40 bg-violet-400/15 px-2.5 py-1 text-[11px] font-bold text-violet-200 hover:bg-violet-400/25"
+              title="Simulate IMU Motion/Pickup wake into Meme Dream Screensaver"
+            >
+              📳 Motion
+            </button>
+          </div>
+        </section>
 
         {/* Voice / URL Dock */}
         <form onSubmit={onTalk} className="mt-4 flex w-full max-w-[820px] gap-2">
@@ -1784,7 +2021,7 @@ export function App() {
             Hardware Spec &amp; Secret Voice Words ({view?.secrets.length ?? 0}/10 unlocked)
           </summary>
           <p className="mt-2 leading-relaxed">
-            Display: <b>1.69" ST7789V2 IPS TFT</b> (240×280 native, rotated <b>280×240 landscape</b>, 262K color, SPI, rounded glass corners) · MCU: <b>ESP32-S3-WROOM-1</b> · Controls: <b>4-way D-Pad + O + X + -- (Hold for I2S Mic PTT)</b>.
+            Display: <b>1.69" ST7789V2 IPS TFT</b> (240×280 native, rotated <b>280×240 landscape</b>, 262K color, SPI, rounded glass corners) · MCU: <b>ESP32-S3-WROOM-1</b> · Controls: <b>4-way D-Pad + O + X + -- (Hold for I2S Mic PTT)</b> · Carry Wake Sensors: <b>Light (ALS/LDR) + Sound (INMP441 Mic) + Motion (LIS3DH/IMU)</b> wake directly into the Meme Dream Screensaver.
           </p>
           <p className="mt-1.5">
             Secret words to try: <span className="font-mono text-[#ffd23f]">{SECRET_HINTS.join(" · ")}</span>

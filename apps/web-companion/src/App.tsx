@@ -8,7 +8,7 @@ import {
   type MiniGameId,
   type SpeciesId,
 } from "@memeagotchi/game-core";
-import { CosmeticBadge, MemeMonster } from "@memeagotchi/monster-ui";
+import { CosmeticBadge, DreamScreensaver, MemeMonster, type DreamSlide } from "@memeagotchi/monster-ui";
 import { ArcadeGamepad, SnesArcadeCanvas, createGamepadController } from "@memeagotchi/snes-games";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -101,8 +101,9 @@ export function App() {
   const [newName, setNewName] = useState("");
   const [talkDraft, setTalkDraft] = useState("");
 
-  // Feed filters + collapsible composer
+  // Feed filters + collapsible composer + ▲ Full-Screen Meme Viewer
   const [feedFilter, setFeedFilter] = useState<FeedFilter>("all");
+  const [fullscreenMemeIdx, setFullscreenMemeIdx] = useState<number | null>(null);
   const [composerOpen, setComposerOpen] = useState(false);
   const [postTitle, setPostTitle] = useState("");
   const [postCaption, setPostCaption] = useState("");
@@ -313,6 +314,62 @@ export function App() {
     return slotFilter === "all" ? list : list.filter((c) => c.slot === slotFilter);
   }, [view?.cosmetics, slotFilter]);
 
+  const hasFedMemes = (view?.dreamMemes.length ?? 0) > 0;
+  const dreamSlides: DreamSlide[] = useMemo(() => {
+    if (!view) return [];
+    const source = view.dreamMemes.length > 0 ? view.dreamMemes : view.memes.slice(0, 4);
+    return source.map((dm) => {
+      const key = "memeKey" in dm ? dm.memeKey : dm.key;
+      return {
+        id: "memeId" in dm ? dm.memeId : dm.id,
+        title: dm.title,
+        emoji: dm.emoji,
+        bg: dm.bg,
+        src: resolveMemeImage({ imageUrl: dm.imageUrl, imageKey: dm.imageKey ?? key }),
+      };
+    });
+  }, [view]);
+
+  // Press ▲ Up Arrow while on Feed tab to toggle Full-Screen Meme mode (◄► browse, O/Enter feed, ▲/Esc exit)
+  useEffect(() => {
+    if (tab !== "feed") {
+      setFullscreenMemeIdx(null);
+      return;
+    }
+    const onKeyDown = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement | null)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+      if (e.key === "ArrowUp") {
+        if (filteredMemes.length === 0) return;
+        e.preventDefault();
+        setFullscreenMemeIdx((cur) => (cur === null ? 0 : null));
+      } else if (fullscreenMemeIdx !== null) {
+        if (e.key === "Escape") {
+          e.preventDefault();
+          setFullscreenMemeIdx(null);
+        } else if (e.key === "ArrowLeft") {
+          e.preventDefault();
+          setFullscreenMemeIdx((cur) =>
+            cur === null ? 0 : (cur + filteredMemes.length - 1) % Math.max(1, filteredMemes.length),
+          );
+        } else if (e.key === "ArrowRight") {
+          e.preventDefault();
+          setFullscreenMemeIdx((cur) =>
+            cur === null ? 0 : (cur + 1) % Math.max(1, filteredMemes.length),
+          );
+        } else if (e.key === "Enter" || e.key === "o" || e.key === "O") {
+          const active = filteredMemes[fullscreenMemeIdx];
+          if (active && !feedMemeMut.isPending) {
+            e.preventDefault();
+            feedMemeMut.mutate(active.id);
+          }
+        }
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [tab, filteredMemes, fullscreenMemeIdx, feedMemeMut]);
+
   if (stateQuery.isPending) {
     return <div className="min-h-screen bg-[var(--bg)] text-[var(--text)] p-8 text-center font-pixel">HATCHING…</div>;
   }
@@ -447,53 +504,67 @@ export function App() {
             className="rounded-[2.1rem] p-3 border-4 border-[var(--border)] shadow-2xl"
             style={{ background: "linear-gradient(155deg, #5b4bb7 0%, #7c5fd4 48%, #47b5b1 100%)" }}
           >
-            <div
-              className="rounded-[1.6rem] px-3 pt-3 pb-2.5 viewport-screen relative overflow-hidden"
-              style={{ background: sky.bg }}
-            >
-              {!sky.textDark && (
-                <div
-                  className="pointer-events-none absolute inset-0 opacity-45"
-                  style={{ backgroundImage: "radial-gradient(#ffffff 1.2px, transparent 1.5px)", backgroundSize: "34px 34px" }}
-                />
-              )}
-              <div className={`relative flex items-center justify-between ${sky.textDark ? "text-[#282b47]" : "text-white"}`}>
-                <span className="font-pixel text-sm">{m.name}</span>
-                <span className="font-pixel text-[11px] bg-[#282b47] text-[#7be6d8] px-2.5 py-1 rounded-full">
-                  STAGE {m.displayStage} · {m.displayStageName}
-                </span>
-              </div>
-
-              {m.speech && (
-                <div className="relative mx-auto mt-1.5 max-w-[86%] rounded-xl bg-white/95 border-2 border-[#282b47] px-3 py-1 text-center text-xs font-bold text-[#282b47] shadow-sm">
-                  “{m.speech}”
-                </div>
-              )}
-
-              <div className="relative">
-                <MonsterSVG
+            {m.isSleeping ? (
+              <div className="rounded-[1.6rem] h-[278px] viewport-screen relative overflow-hidden">
+                <DreamScreensaver
                   species={m.species}
-                  name={m.name}
-                  displayStage={m.displayStage}
-                  actualStage={m.stage}
-                  mood={displayMood}
-                  sleeping={m.isSleeping}
-                  roasted={m.isRoasted}
-                  equipped={view.equippedItems}
-                  onPet={() => {
-                    sfx.pet(soundOn);
-                    showToast(`💖 ${m.name} loves head pats! (Tap care buttons or feed a meme)`);
-                  }}
+                  stage={m.displayStage}
+                  petName={m.name}
+                  energy={m.energy}
+                  slides={dreamSlides}
+                  fromFedHistory={hasFedMemes}
+                  wakeHint="TAP WAKE BELOW"
                 />
               </div>
+            ) : (
+              <div
+                className="rounded-[1.6rem] px-3 pt-3 pb-2.5 viewport-screen relative overflow-hidden"
+                style={{ background: sky.bg }}
+              >
+                {!sky.textDark && (
+                  <div
+                    className="pointer-events-none absolute inset-0 opacity-45"
+                    style={{ backgroundImage: "radial-gradient(#ffffff 1.2px, transparent 1.5px)", backgroundSize: "34px 34px" }}
+                  />
+                )}
+                <div className={`relative flex items-center justify-between ${sky.textDark ? "text-[#282b47]" : "text-white"}`}>
+                  <span className="font-pixel text-sm">{m.name}</span>
+                  <span className="font-pixel text-[11px] bg-[#282b47] text-[#7be6d8] px-2.5 py-1 rounded-full">
+                    STAGE {m.displayStage} · {m.displayStageName}
+                  </span>
+                </div>
 
-              <p className={`relative text-center font-bold -mt-1 ${sky.textDark ? "text-[#282b47]" : "text-white"}`}>
-                {m.moodLabel}
-              </p>
-              <p className={`relative text-center text-xs ${sky.textDark ? "text-[#282b47]/65" : "text-white/70"}`}>
-                {m.speciesDef.name} · Stage {m.stage} {m.stageName} · {m.digestedCount} digested · tap {m.name} to pet!
-              </p>
-            </div>
+                {m.speech && (
+                  <div className="relative mx-auto mt-1.5 max-w-[86%] rounded-xl bg-white/95 border-2 border-[#282b47] px-3 py-1 text-center text-xs font-bold text-[#282b47] shadow-sm">
+                    “{m.speech}”
+                  </div>
+                )}
+
+                <div className="relative">
+                  <MonsterSVG
+                    species={m.species}
+                    name={m.name}
+                    displayStage={m.displayStage}
+                    actualStage={m.stage}
+                    mood={displayMood}
+                    sleeping={m.isSleeping}
+                    roasted={m.isRoasted}
+                    equipped={view.equippedItems}
+                    onPet={() => {
+                      sfx.pet(soundOn);
+                      showToast(`💖 ${m.name} loves head pats! (Tap care buttons or feed a meme)`);
+                    }}
+                  />
+                </div>
+
+                <p className={`relative text-center font-bold -mt-1 ${sky.textDark ? "text-[#282b47]" : "text-white"}`}>
+                  {m.moodLabel}
+                </p>
+                <p className={`relative text-center text-xs ${sky.textDark ? "text-[#282b47]/65" : "text-white/70"}`}>
+                  {m.speciesDef.name} · Stage {m.stage} {m.stageName} · {m.digestedCount} digested · tap {m.name} to pet!
+                </p>
+              </div>
+            )}
 
             <div className="flex flex-wrap justify-between items-center gap-2 px-2.5 py-2 text-white text-sm font-bold">
               <span>💧 {m.drip} Drip</span>
@@ -818,7 +889,7 @@ export function App() {
             </div>
           </div>
           <p className="text-sm text-[var(--dim)] mt-1">
-            Label memes to grow power — tasty +2, spicy +3 (adds Heat!), blech −1. Eat early for viral backflow.
+            Label memes to grow power — tasty +2, spicy +3 (adds Heat!), blech −1. Press <b>▲ Up Arrow</b> for Full-Screen Meme mode.
           </p>
 
           {/* Filter pills + Collapsible Meme Composer button */}
@@ -941,12 +1012,28 @@ export function App() {
             {filteredMemes.length === 0 && (
               <p className="text-center text-sm text-[var(--dim)] py-8">No memes match this filter yet.</p>
             )}
-            {filteredMemes.map((meme) => {
+            {filteredMemes.map((meme, memeIdx) => {
               const imgSrc = resolveMemeImage(meme);
               return (
                 <article key={meme.id} className="rounded-2xl border border-[var(--border)] overflow-hidden panel">
                   {imgSrc && (
-                    <img src={imgSrc} alt={`Meme: ${meme.title}`} className="w-full h-56 object-cover" loading="lazy" />
+                    <div className="relative">
+                      <img
+                        src={imgSrc}
+                        alt={`Meme: ${meme.title}`}
+                        onClick={() => setFullscreenMemeIdx(memeIdx)}
+                        className="w-full h-56 object-cover cursor-pointer"
+                        loading="lazy"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setFullscreenMemeIdx(memeIdx)}
+                        className="absolute top-2.5 right-2.5 rounded-full bg-black/75 border border-white/25 px-2.5 py-1 text-[11px] font-bold text-[#fde047] hover:bg-black/90"
+                        title="Display meme full screen (or press ▲ Up Arrow)"
+                      >
+                        ⤢ Full Screen (▲)
+                      </button>
+                    </div>
                   )}
                   <div className="p-4 flex gap-3" style={{ background: meme.bg }}>
                     <div className="text-[#1e1b4b] min-w-0">
@@ -1067,6 +1154,117 @@ export function App() {
               );
             })}
           </div>
+
+          {/* Full-Screen Meme Feed Lightbox (opened via ▲ Up Arrow or Full Screen button) */}
+          {fullscreenMemeIdx !== null && filteredMemes[fullscreenMemeIdx] && (() => {
+            const fsMeme = filteredMemes[fullscreenMemeIdx]!;
+            const fsSrc = resolveMemeImage(fsMeme);
+            return (
+              <div
+                className="fixed inset-0 z-50 flex flex-col bg-[#080614]/96 backdrop-blur-md p-3 sm:p-5"
+                role="dialog"
+                aria-modal="true"
+                aria-label={`Full screen meme: ${fsMeme.title}`}
+              >
+                <div className="flex items-center justify-between gap-2 text-xs text-white/85 pb-2">
+                  <span className="font-pixel text-sm text-[var(--accent)] truncate">
+                    {fsMeme.emoji} {fsMeme.title} ({fullscreenMemeIdx + 1}/{filteredMemes.length})
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setFullscreenMemeIdx(null)}
+                    className="rounded-full border border-white/25 bg-white/10 px-3 py-1 font-bold text-white hover:bg-white/20 shrink-0"
+                  >
+                    ✕ Exit (▲ / Esc)
+                  </button>
+                </div>
+
+                <div className="relative flex-1 min-h-0 flex items-center justify-center">
+                  <button
+                    type="button"
+                    aria-label="Previous meme"
+                    onClick={() =>
+                      setFullscreenMemeIdx((cur) =>
+                        cur === null ? 0 : (cur + filteredMemes.length - 1) % filteredMemes.length,
+                      )
+                    }
+                    className="absolute left-1 sm:left-3 z-10 h-11 w-11 rounded-full bg-black/70 border border-white/25 text-lg font-bold text-white hover:bg-black/90"
+                  >
+                    ◄
+                  </button>
+
+                  {fsSrc ? (
+                    <img
+                      src={fsSrc}
+                      alt={fsMeme.caption || fsMeme.title}
+                      className="max-h-full max-w-full rounded-2xl object-contain border-2 border-[var(--border)] shadow-2xl"
+                    />
+                  ) : (
+                    <div
+                      className="flex h-72 w-72 items-center justify-center rounded-3xl text-7xl"
+                      style={{ background: fsMeme.bg }}
+                    >
+                      {fsMeme.emoji}
+                    </div>
+                  )}
+
+                  <button
+                    type="button"
+                    aria-label="Next meme"
+                    onClick={() =>
+                      setFullscreenMemeIdx((cur) =>
+                        cur === null ? 0 : (cur + 1) % filteredMemes.length,
+                      )
+                    }
+                    className="absolute right-1 sm:right-3 z-10 h-11 w-11 rounded-full bg-black/70 border border-white/25 text-lg font-bold text-white hover:bg-black/90"
+                  >
+                    ►
+                  </button>
+                </div>
+
+                <div className="pt-3 space-y-2 max-w-2xl mx-auto w-full text-center">
+                  {fsMeme.caption && <p className="text-sm text-white/85">{fsMeme.caption}</p>}
+                  <div className="flex flex-wrap items-center justify-center gap-2 text-xs">
+                    <button
+                      type="button"
+                      disabled={fsMeme.votedToday || voteMut.isPending}
+                      onClick={() => voteMut.mutate({ memeId: fsMeme.id, label: "tasty" })}
+                      className="px-3 py-1.5 rounded-full bg-emerald-500/25 border border-emerald-400/60 font-bold disabled:opacity-40"
+                    >
+                      😋 Tasty · {fsMeme.tasty}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={fsMeme.votedToday || voteMut.isPending}
+                      onClick={() => voteMut.mutate({ memeId: fsMeme.id, label: "spicy" })}
+                      className="px-3 py-1.5 rounded-full bg-rose-500/25 border border-rose-400/60 font-bold disabled:opacity-40"
+                    >
+                      🌶️ Spicy · {fsMeme.spicy}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={fsMeme.votedToday || voteMut.isPending}
+                      onClick={() => voteMut.mutate({ memeId: fsMeme.id, label: "blech" })}
+                      className="px-3 py-1.5 rounded-full bg-violet-500/25 border border-violet-400/60 font-bold disabled:opacity-40"
+                    >
+                      🤢 Blech · {fsMeme.blech}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={feedMemeMut.isPending}
+                      onClick={() => feedMemeMut.mutate(fsMeme.id)}
+                      className="px-4 py-1.5 rounded-full bg-[var(--accent)] text-[#141026] font-bold disabled:opacity-40"
+                    >
+                      🍽️ Feed to {m.name} (O / Enter)
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-[var(--dim)]">
+                    Keys: <b>◄ ►</b> Browse · <b>O / Enter</b> Feed · <b>▲ / Esc</b> Exit Full Screen
+                  </p>
+                </div>
+              </div>
+            );
+          })()}
         </main>
       )}
 

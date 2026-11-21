@@ -390,4 +390,28 @@ describe("@memeagotchi/game-core", () => {
     assert.deepEqual(milestonePowersFor(15), { turboCharge: true, secondWind: true, memeOverdrive: false });
     assert.deepEqual(milestonePowersFor(30), { turboCharge: true, secondWind: true, memeOverdrive: true });
   });
+
+  it("projects fed memes (in-belly and digested) into dreamMemes newest-first for the Sleep Dream Screensaver", () => {
+    let s = createFreshState(T0, 60); // demo clock: digests in 2 minutes
+    const m1 = s.memes[0]!;
+    const m2 = s.memes[1]!;
+
+    // Initially empty
+    assert.equal(toGameView(s, T0).dreamMemes.length, 0);
+
+    // Feed m1, let it digest (after 130s in 60x demo clock)
+    s = feedMeme(s, { memeId: m1.id }, T0 + 1000).state;
+    s = tickState(s, T0 + 140_000).state;
+    assert.equal(s.digestedCount, 1);
+
+    // Feed m2 (currently in belly)
+    s = feedMeme(s, { memeId: m2.id }, T0 + 150_000).state;
+
+    const view = toGameView(s, T0 + 151_000);
+    assert.equal(view.dreamMemes.length, 2);
+    assert.equal(view.dreamMemes[0]!.memeKey, m2.key);
+    assert.equal(view.dreamMemes[0]!.inBelly, true);
+    assert.equal(view.dreamMemes[1]!.memeKey, m1.key);
+    assert.equal(view.dreamMemes[1]!.inBelly, false);
+  });
 });

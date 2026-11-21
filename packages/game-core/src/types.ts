@@ -289,6 +289,19 @@ export interface MilestonePowers {
   memeOverdrive: boolean;
 }
 
+export interface DreamMemeView {
+  memeId: number;
+  memeKey: string;
+  title: string;
+  caption: string;
+  emoji: string;
+  imageKey: string | null;
+  imageUrl: string | null;
+  bg: string;
+  fedAtReal: number;
+  inBelly: boolean;
+}
+
 export interface GameView {
   hatched: boolean;
   speciesCatalog: readonly SpeciesDef[];
@@ -356,6 +369,8 @@ export interface GameView {
     powerAtFed: number;
     powerNow: number;
   }>;
+  /** Unique memes the monster has fed on (currently in belly + previously digested), newest first, for the Sleep Dream Screensaver */
+  dreamMemes: DreamMemeView[];
   memes: Array<{
     id: number;
     key: string;

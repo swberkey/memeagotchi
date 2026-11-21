@@ -12,6 +12,7 @@ Reference docs:
 - **Part:** 1.69" IPS TFT LCD Breakout (`240×280` native, rotated landscape `280×240` via ST7789 `MADCTL`), 262K colors, 4-wire SPI, 3.3V logic, rounded corners.
 - **Sources:** Waveshare 1.69" LCD Module (~\$7–\$10), Adafruit 1.69" 280×240 Round Rectangle TFT (~\$10–\$15), generic ST7789V2 1.69" SPI breakouts on AliExpress/Amazon (~\$2–\$6).
 - **Double-Buffer RAM:** `280 × 240 × 2 bytes = 134.4 KB` per RGB565 frame (`269 KB` double-buffered in ESP32-S3 PSRAM/SRAM).
+- **Always-On Carry Wake Sensors (Meme Dream Screensaver):** Pair a low-power I2C IMU (`LIS3DH` / `QMI8658` motion interrupt) + ambient light sensor (`BH1750` or LDR divider) + `INMP441` mic wake so the sleeping handheld automatically lights up into a full-screen slideshow of the monster's fed memes with a gliding 1/8-size pixel sleeping sprite whenever it detects light, sound, or motion.
 
 ## Pre-Hardware Entry Gate
 - [x] Core app & simulator unified on `packages/game-core`
