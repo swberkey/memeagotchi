@@ -1,4 +1,5 @@
 import { STAGES, type GameView, type Label, type Mood } from "@memeagotchi/game-core";
+import { CosmeticBadge } from "@memeagotchi/monster-ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { api } from "./api";
@@ -1208,7 +1209,9 @@ export function App() {
                             const i = view.cosmetics.indexOf(c);
                             return (
                               <MenuRow key={c.id} selected={i === nav.shop} tall>
-                                <span className="text-[20px] leading-none">{c.emoji}</span>
+                                <span className="inline-flex h-[24px] w-[24px] shrink-0 items-center justify-center rounded bg-white/90 p-[2px]">
+                                  <CosmeticBadge assetId={c.id} size={20} />
+                                </span>
                                 <span className="min-w-0 flex-1 truncate text-[12px]">{c.name.toUpperCase()}</span>
                                 <span className="font-pixel shrink-0 text-[18px] text-[#ffd23f]">
                                   {c.equipped ? "★ ON" : c.owned ? "IN BAG" : `💧${c.price}`}
@@ -1237,7 +1240,9 @@ export function App() {
                               const i = ownedItems.indexOf(c);
                               return (
                                 <MenuRow key={c.id} selected={i === nav.bag} tall>
-                                  <span className="text-[20px] leading-none">{c.emoji}</span>
+                                  <span className="inline-flex h-[24px] w-[24px] shrink-0 items-center justify-center rounded bg-white/90 p-[2px]">
+                                    <CosmeticBadge assetId={c.id} size={20} />
+                                  </span>
                                   <span className="min-w-0 flex-1 truncate text-[12px]">{c.name.toUpperCase()}</span>
                                   <span className="font-pixel shrink-0 text-[16px] text-[#ffd23f]">{c.equipped ? "★ WORN" : c.slot.toUpperCase()}</span>
                                 </MenuRow>
@@ -1445,6 +1450,29 @@ export function App() {
               onContextMenu={(e) => e.preventDefault()}
             />
             <span className="font-pixel mt-2 text-[15px] tracking-widest text-[#8f9096]">PRESS · HOLD · 2×PRESS</span>
+            <div className="mt-2 flex items-center gap-2">
+              <button
+                type="button"
+                onClick={doShort}
+                className="rounded-md border border-white/15 bg-black/35 px-3 py-1 font-pixel text-[15px] text-white/85 hover:border-[#ffb02e] hover:text-[#ffd23f]"
+              >
+                TAP
+              </button>
+              <button
+                type="button"
+                onClick={doLong}
+                className="rounded-md border border-white/15 bg-black/35 px-3 py-1 font-pixel text-[15px] text-white/85 hover:border-[#ffb02e] hover:text-[#ffd23f]"
+              >
+                HOLD
+              </button>
+              <button
+                type="button"
+                onClick={doDouble}
+                className="rounded-md border border-white/15 bg-black/35 px-3 py-1 font-pixel text-[15px] text-white/85 hover:border-[#ffb02e] hover:text-[#ffd23f]"
+              >
+                2× TAP
+              </button>
+            </div>
             <span className="mt-1 text-[10px] tracking-[0.3em] text-[#55565e]">— USB-C —</span>
           </div>
         </div>

@@ -4,6 +4,7 @@ WORKDIR /app
 COPY package.json tsconfig.base.json ./
 COPY packages/game-core/package.json packages/game-core/
 COPY packages/rpc-sdk/package.json packages/rpc-sdk/
+COPY packages/monster-ui/package.json packages/monster-ui/
 COPY apps/server/package.json apps/server/
 COPY apps/web-companion/package.json apps/web-companion/
 COPY apps/handheld-sim/package.json apps/handheld-sim/

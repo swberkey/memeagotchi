@@ -1,13 +1,54 @@
-import { STAGES, type GameView, type Label, type MemeImageKey } from "@memeagotchi/game-core";
+import {
+  STAGES,
+  type CosmeticSlot,
+  type GameView,
+  type Label,
+  type MemeImageKey,
+} from "@memeagotchi/game-core";
+import { CosmeticBadge, MemeMonster } from "@memeagotchi/monster-ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, uploadMemeFile } from "./api";
 import { LabelMatch } from "./components/LabelMatch";
 import { MemeDodge } from "./components/MemeDodge";
 import { MonsterSVG } from "./components/MonsterSVG";
 import { MEME_IMAGES, MEME_TEMPLATES, resolveMemeImage } from "./memeImages";
+import { sfx } from "./sound";
 
 const HANDHELD_URL = import.meta.env.DEV ? "http://localhost:5174" : "/handheld/";
+
+type FeedFilter = "all" | "hot" | "tasty" | "spicy" | "fresh";
+type SlotFilter = "all" | CosmeticSlot;
+
+function getViewportSky(isSleeping: boolean): { bg: string; textDark: boolean; label: string } {
+  if (isSleeping) {
+    return {
+      bg: "linear-gradient(180deg, #171847 0%, #2b2970 55%, #3f3d94 100%)",
+      textDark: false,
+      label: "night",
+    };
+  }
+  const h = new Date().getHours();
+  if (h >= 7 && h < 17) {
+    return {
+      bg: "linear-gradient(180deg, #dff8ff 0%, #eefcf9 58%, #f4edff 100%)",
+      textDark: true,
+      label: "day",
+    };
+  }
+  if (h >= 17 && h < 21) {
+    return {
+      bg: "linear-gradient(180deg, #fde4f2 0%, #efe6ff 55%, #dcf6f4 100%)",
+      textDark: true,
+      label: "evening",
+    };
+  }
+  return {
+    bg: "linear-gradient(180deg, #1b1c4b 0%, #2d296c 55%, #413788 100%)",
+    textDark: false,
+    label: "night",
+  };
+}
 
 function StatBar({
   label,
@@ -29,7 +70,7 @@ function StatBar({
         <span>
           {icon} {label}
         </span>
-        <span className={value < 30 ? "text-red-400 font-bold" : ""}>
+        <span className={value < 30 ? "text-rose-400 font-bold" : "font-medium"}>
           {value}
           {cap > 100 ? `/${cap}` : ""}
         </span>
@@ -37,7 +78,7 @@ function StatBar({
       <div className="h-3 rounded-full bg-black/40 overflow-hidden border border-[var(--border)]">
         <div
           className="h-full rounded-full transition-all duration-300"
-          style={{ width: `${pct}%`, background: value < 30 ? "#ef4444" : color }}
+          style={{ width: `${pct}%`, background: value < 30 ? "#fb7185" : color }}
         />
       </div>
     </div>
@@ -54,16 +95,24 @@ export function App() {
   const [matchRunId, setMatchRunId] = useState(1);
   const [newName, setNewName] = useState("");
   const [talkDraft, setTalkDraft] = useState("");
+
+  // Feed filters + collapsible composer
+  const [feedFilter, setFeedFilter] = useState<FeedFilter>("all");
+  const [composerOpen, setComposerOpen] = useState(false);
   const [postTitle, setPostTitle] = useState("");
   const [postCaption, setPostCaption] = useState("");
   const [postImageKey, setPostImageKey] = useState<MemeImageKey>("distracted");
   const [uploadedUrl, setUploadedUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [labelDrafts, setLabelDrafts] = useState<Record<number, string>>({});
+
+  // Drip shop slot filter
+  const [slotFilter, setSlotFilter] = useState<SlotFilter>("all");
+
   const [resetArmed, setResetArmed] = useState(false);
+  const [eatingUntil, setEatingUntil] = useState(0);
   const [nowSec, setNowSec] = useState(() => Date.now());
 
-  // 1-second live countdown ticker for belly digestion & cooldowns
   useEffect(() => {
     const iv = setInterval(() => setNowSec(Date.now()), 1000);
     return () => clearInterval(iv);
@@ -89,6 +138,7 @@ export function App() {
   });
 
   const view: GameView | undefined = stateQuery.data?.view;
+  const soundOn = view?.settings.soundOn ?? true;
 
   useEffect(() => {
     if (view?.notes?.length) {
@@ -97,10 +147,13 @@ export function App() {
   }, [view?.notes, showToast]);
 
   const applyView = useCallback(
-    (res: { message?: string; view: GameView }) => {
+    (res: { ok?: boolean; message?: string; view: GameView }) => {
       qc.setQueryData(["gameState"], { view: res.view });
       const combined = [res.message, ...(res.view.notes ?? [])].filter(Boolean).join(" · ");
       if (combined) showToast(combined);
+      if (res.ok === false) sfx.bad(res.view.settings.soundOn);
+      else if (combined.includes("SECRET") || combined.includes("EVOLVED")) sfx.sparkle(res.view.settings.soundOn);
+      else sfx.ok(res.view.settings.soundOn);
     },
     [qc, showToast],
   );
@@ -133,7 +186,10 @@ export function App() {
   });
   const feedMemeMut = useMutation({
     mutationFn: (memeId: number) => api.feedMeme({ memeId }),
-    onSuccess: applyView,
+    onSuccess: (r) => {
+      if (r.ok) setEatingUntil(Date.now() + 1800);
+      applyView(r);
+    },
     onError: (e: Error) => showToast(e.message),
   });
   const shareMut = useMutation({
@@ -175,6 +231,7 @@ export function App() {
         setPostTitle("");
         setPostCaption("");
         setUploadedUrl(null);
+        setComposerOpen(false);
       }
     },
     onError: (e: Error) => showToast(e.message),
@@ -225,6 +282,20 @@ export function App() {
     }
   };
 
+  const filteredMemes = useMemo(() => {
+    const list = view?.memes ?? [];
+    if (feedFilter === "hot") return [...list].sort((a, b) => b.power - a.power);
+    if (feedFilter === "tasty") return list.filter((m) => m.dominant === "tasty");
+    if (feedFilter === "spicy") return list.filter((m) => m.dominant === "spicy");
+    if (feedFilter === "fresh") return list.filter((m) => m.isFresh);
+    return list;
+  }, [view?.memes, feedFilter]);
+
+  const filteredCosmetics = useMemo(() => {
+    const list = view?.cosmetics ?? [];
+    return slotFilter === "all" ? list : list.filter((c) => c.slot === slotFilter);
+  }, [view?.cosmetics, slotFilter]);
+
   if (stateQuery.isPending) {
     return <div className="min-h-screen bg-[var(--bg)] text-[var(--text)] p-8 text-center font-pixel">HATCHING…</div>;
   }
@@ -250,6 +321,8 @@ export function App() {
     ? Math.min(100, Math.max(0, ((m.xp - curStageDef.xp) / (m.nextStageXp - curStageDef.xp)) * 100))
     : 100;
   const votesLeft = Math.max(0, view.voteBudget - view.votesUsedToday);
+  const sky = getViewportSky(m.isSleeping);
+  const displayMood = nowSec < eatingUntil ? "eating" : m.mood;
 
   const trainBlockReason = m.isSleeping
     ? "Your monster is asleep — wake it up before training."
@@ -283,28 +356,35 @@ export function App() {
             <button
               type="button"
               onClick={() => settingsMut.mutate({ clock: view.settings.clock === 60 ? 1 : 60 })}
-              className="px-2 py-1 rounded-full bg-[var(--surface2)] border border-[var(--border)] text-[11px] font-bold"
+              className="px-2 py-1 rounded-full bg-[var(--surface2)] border border-[var(--border)] text-[11px] font-bold hover:border-[var(--accent)]"
               title="Switch between Demo 60× speed and Real-Time GDD 1× speed"
             >
               ⏱ {view.settings.clock === 60 ? "Demo 60×" : "Real-Time 1×"}
             </button>
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <a
-              href={HANDHELD_URL}
-              target="_blank"
-              rel="noreferrer"
-              className="px-2.5 py-1 rounded-full bg-[#ffb02e] text-black font-bold text-[11px] hover:brightness-110"
+            <button
+              type="button"
+              onClick={() => settingsMut.mutate({ soundOn: !soundOn })}
+              className="px-2 py-1 rounded-full bg-[var(--surface2)] border border-[var(--border)] text-[11px]"
+              aria-label={soundOn ? "Mute sound effects" : "Enable sound effects"}
+              title={soundOn ? "Sound On" : "Sound Off"}
             >
-              📟 Handheld Sim ↗
-            </a>
+              {soundOn ? "🔊" : "🔇"}
+            </button>
           </div>
+          <a
+            href={HANDHELD_URL}
+            target="_blank"
+            rel="noreferrer"
+            className="px-2.5 py-1 rounded-full bg-[#ffd23f] text-[#141026] font-bold text-[11px] hover:brightness-110 shrink-0"
+          >
+            📟 Handheld Sim ↗
+          </a>
         </div>
       </header>
 
       {toast && (
         <div
-          className="fixed top-14 left-1/2 -translate-x-1/2 z-50 max-w-[92vw] bg-black/95 text-white text-sm px-4 py-3 rounded-2xl border-2 border-[var(--accent)] shadow-xl"
+          className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 max-w-[92vw] bg-[#100c20]/95 text-white text-sm px-4 py-2.5 rounded-2xl border-2 border-[var(--accent)] shadow-2xl"
           role="status"
         >
           {toast}
@@ -313,47 +393,71 @@ export function App() {
 
       {tab === "home" && (
         <main className="px-4 pt-4 max-w-2xl mx-auto">
-          {/* Tamagotchi viewport */}
+          {/* Tamagotchi Mint/Lavender Shell */}
           <div
-            className="rounded-[2rem] p-3 border-4 border-[var(--border)] shadow-2xl"
-            style={{ background: "linear-gradient(160deg,#7c3aed,#db2777)" }}
+            className="rounded-[2.1rem] p-3 border-4 border-[var(--border)] shadow-2xl"
+            style={{ background: "linear-gradient(155deg, #5b4bb7 0%, #7c5fd4 48%, #47b5b1 100%)" }}
           >
-            <div className="rounded-[1.6rem] px-3 pt-3 pb-2 viewport-screen relative" style={{ backgroundColor: "var(--viewport)" }}>
-              <div className="flex items-center justify-between text-black">
+            <div
+              className="rounded-[1.6rem] px-3 pt-3 pb-2.5 viewport-screen relative overflow-hidden"
+              style={{ background: sky.bg }}
+            >
+              {!sky.textDark && (
+                <div
+                  className="pointer-events-none absolute inset-0 opacity-45"
+                  style={{ backgroundImage: "radial-gradient(#ffffff 1.2px, transparent 1.5px)", backgroundSize: "34px 34px" }}
+                />
+              )}
+              <div className={`relative flex items-center justify-between ${sky.textDark ? "text-[#282b47]" : "text-white"}`}>
                 <span className="font-pixel text-sm">{m.name}</span>
-                <span className="font-pixel text-[11px] bg-black text-lime-300 px-2 py-1 rounded-full">
+                <span className="font-pixel text-[11px] bg-[#282b47] text-[#7be6d8] px-2.5 py-1 rounded-full">
                   STAGE {m.displayStage} · {m.displayStageName}
                 </span>
               </div>
+
               {m.speech && (
-                <div className="mx-auto mt-1 max-w-[85%] rounded-xl bg-white border-2 border-black/80 px-3 py-1 text-center text-xs font-bold text-black shadow-sm">
+                <div className="relative mx-auto mt-1.5 max-w-[86%] rounded-xl bg-white/95 border-2 border-[#282b47] px-3 py-1 text-center text-xs font-bold text-[#282b47] shadow-sm">
                   “{m.speech}”
                 </div>
               )}
-              <MonsterSVG
-                displayStage={m.displayStage}
-                actualStage={m.stage}
-                mood={m.mood}
-                sleeping={m.isSleeping}
-                roasted={m.isRoasted}
-                equipped={view.equippedItems}
-              />
-              <p className="text-center text-black font-bold -mt-1">{m.moodLabel}</p>
-              <p className="text-center text-black/60 text-xs">
-                Actual stage: {m.stage} {m.stageName} · {m.digestedCount} memes digested
+
+              <div className="relative">
+                <MonsterSVG
+                  displayStage={m.displayStage}
+                  actualStage={m.stage}
+                  mood={displayMood}
+                  sleeping={m.isSleeping}
+                  roasted={m.isRoasted}
+                  equipped={view.equippedItems}
+                  onPet={() => {
+                    sfx.pet(soundOn);
+                    showToast(`💖 ${m.name} loves head pats! (Tap care buttons or feed a meme)`);
+                  }}
+                />
+              </div>
+
+              <p className={`relative text-center font-bold -mt-1 ${sky.textDark ? "text-[#282b47]" : "text-white"}`}>
+                {m.moodLabel}
+              </p>
+              <p className={`relative text-center text-xs ${sky.textDark ? "text-[#282b47]/65" : "text-white/70"}`}>
+                Actual stage: {m.stage} {m.stageName} · {m.digestedCount} digested · tap {m.name} to pet!
               </p>
             </div>
-            <div className="flex justify-between items-center px-2 py-2 text-white text-sm font-bold">
+
+            <div className="flex justify-between items-center px-2.5 py-2 text-white text-sm font-bold">
               <span>💧 {m.drip} Drip</span>
               <span>🌡️ Heat {m.heat}/100</span>
-              <span>⭐ {m.xp} XP</span>
+              <span>⭐ {m.xp.toLocaleString()} XP</span>
             </div>
             <div className="px-2 pb-1">
-              <div className="h-2.5 rounded-full bg-black/40 overflow-hidden">
-                <div className="h-full bg-[var(--accent)] transition-all duration-300" style={{ width: `${xpPct}%` }} />
+              <div className="h-2.5 rounded-full bg-black/35 overflow-hidden">
+                <div
+                  className="h-full transition-all duration-300"
+                  style={{ width: `${xpPct}%`, background: "linear-gradient(90deg, #7be6d8, #fde047)" }}
+                />
               </div>
-              <p className="text-white/80 text-[11px] mt-1">
-                {m.nextStageXp ? `${m.nextStageXp - m.xp} XP to ${m.nextStageName}` : "Max evolution reached 👑"}
+              <p className="text-white/85 text-[11px] mt-1">
+                {m.nextStageXp ? `${(m.nextStageXp - m.xp).toLocaleString()} XP to ${m.nextStageName}` : "Max evolution reached 👑"}
               </p>
             </div>
           </div>
@@ -377,14 +481,14 @@ export function App() {
             aria-label="Monster stats"
             className="mt-4 rounded-2xl panel border border-[var(--border)] p-4 grid grid-cols-2 gap-x-5 gap-y-3"
           >
-            <StatBar label="Fullness" value={m.fullness} cap={m.statCap} icon="🍖" color="#a3e635" />
-            <StatBar label="Happiness" value={m.happiness} cap={m.statCap} icon="💛" color="#facc15" />
-            <StatBar label="Hygiene" value={m.hygiene} cap={m.statCap} icon="🛁" color="#22d3ee" />
-            <StatBar label="Energy" value={m.energy} cap={m.statCap} icon="⚡" color="#f472b6" />
+            <StatBar label="Fullness" value={m.fullness} cap={m.statCap} icon="🍖" color="#7be6d8" />
+            <StatBar label="Happiness" value={m.happiness} cap={m.statCap} icon="💛" color="#fde047" />
+            <StatBar label="Hygiene" value={m.hygiene} cap={m.statCap} icon="🛁" color="#38bdf8" />
+            <StatBar label="Energy" value={m.energy} cap={m.statCap} icon="⚡" color="#c4b5fd" />
           </section>
 
           {m.fullness === 0 && (
-            <p className="mt-2 text-red-300 text-sm font-bold">
+            <p className="mt-2 text-rose-300 text-sm font-bold">
               ⚠️ Hangry! Your monster won't train or gain digestion power until fed.
             </p>
           )}
@@ -405,7 +509,7 @@ export function App() {
               type="button"
               disabled={careMut.isPending || feedCd > 0}
               onClick={() => careMut.mutate("feed")}
-              className="py-3.5 rounded-2xl shadow-md bg-[var(--accent)] text-black font-bold text-sm disabled:opacity-50"
+              className="py-3.5 rounded-2xl shadow-md bg-[#7be6d8] text-[#141026] font-bold text-sm disabled:opacity-45"
             >
               🍖
               <br />
@@ -415,7 +519,7 @@ export function App() {
               type="button"
               disabled={careMut.isPending || groomCd > 0}
               onClick={() => careMut.mutate("groom")}
-              className="py-3.5 rounded-2xl shadow-md bg-[var(--accent3)] text-black font-bold text-sm disabled:opacity-50"
+              className="py-3.5 rounded-2xl shadow-md bg-[#7dd3fc] text-[#141026] font-bold text-sm disabled:opacity-45"
             >
               🛁
               <br />
@@ -425,7 +529,7 @@ export function App() {
               type="button"
               disabled={careMut.isPending || playCd > 0}
               onClick={() => careMut.mutate("play")}
-              className="py-3.5 rounded-2xl shadow-md bg-[var(--accent2)] text-black font-bold text-sm disabled:opacity-50"
+              className="py-3.5 rounded-2xl shadow-md bg-[#f9a8d4] text-[#141026] font-bold text-sm disabled:opacity-45"
             >
               🎾
               <br />
@@ -436,7 +540,7 @@ export function App() {
                 type="button"
                 disabled={careMut.isPending}
                 onClick={() => careMut.mutate("wake")}
-                className="py-3.5 rounded-2xl shadow-md bg-yellow-300 text-black font-bold text-sm"
+                className="py-3.5 rounded-2xl shadow-md bg-[#fde047] text-[#141026] font-bold text-sm"
               >
                 ☀️
                 <br />
@@ -447,7 +551,7 @@ export function App() {
                 type="button"
                 disabled={careMut.isPending}
                 onClick={() => careMut.mutate("sleep")}
-                className="py-3.5 rounded-2xl shadow-md bg-indigo-300 text-black font-bold text-sm"
+                className="py-3.5 rounded-2xl shadow-md bg-[#c4b5fd] text-[#141026] font-bold text-sm"
               >
                 💤
                 <br />
@@ -456,9 +560,9 @@ export function App() {
             )}
           </section>
 
-          {/* Voice / Talk box (shared with Handheld Muse brain) */}
+          {/* Voice / Talk box */}
           <form
-            className="mt-4 rounded-2xl panel border border-[var(--border)] p-4 flex gap-2"
+            className="mt-4 rounded-2xl panel border border-[var(--border)] p-3.5 flex gap-2"
             onSubmit={(e) => {
               e.preventDefault();
               if (talkDraft.trim()) talkMut.mutate(talkDraft.trim());
@@ -469,12 +573,12 @@ export function App() {
               value={talkDraft}
               onChange={(e) => setTalkDraft(e.target.value)}
               placeholder={`🎙️ Talk to ${m.name} (try "feed", "doge", "stonks")…`}
-              className="flex-1 min-w-0 bg-[var(--surface2)] border border-[var(--border)] rounded-xl px-3 py-2 text-sm"
+              className="flex-1 min-w-0 bg-[var(--bg)]/60 border border-[var(--border)] rounded-xl px-3 py-2 text-sm"
             />
             <button
               type="submit"
               disabled={!talkDraft.trim() || talkMut.isPending}
-              className="px-4 py-2 rounded-xl bg-[#ffb02e] text-black font-bold text-sm disabled:opacity-40"
+              className="px-4 py-2 rounded-xl bg-[#ffd23f] text-[#141026] font-bold text-sm disabled:opacity-40"
             >
               Speak
             </button>
@@ -482,12 +586,21 @@ export function App() {
 
           {/* Belly */}
           <section aria-label="Belly meme slots" className="mt-4 rounded-2xl panel border border-[var(--border)] p-4">
-            <h2 className="font-pixel text-sm">
-              BELLY — MEME SLOTS {view.belly.length}/{m.memeSlots}
-            </h2>
+            <div className="flex items-center justify-between">
+              <h2 className="font-pixel text-sm">
+                BELLY — MEME SLOTS {view.belly.length}/{m.memeSlots}
+              </h2>
+              <button
+                type="button"
+                onClick={() => setTab("feed")}
+                className="text-xs font-bold text-[var(--accent)] hover:underline"
+              >
+                Browse Feed →
+              </button>
+            </div>
             {view.belly.length === 0 ? (
               <p className="text-sm text-[var(--dim)] mt-2">
-                Belly empty. Head to the Feed and feed {m.name} a meme — it digests in{" "}
+                Belly empty. Feed {m.name} a meme from the Feed — it digests in{" "}
                 {view.settings.digestSeconds >= 3600
                   ? `${Math.round(view.settings.digestSeconds / 3600)}h`
                   : `${view.settings.digestSeconds}s`}{" "}
@@ -501,7 +614,7 @@ export function App() {
                   return (
                     <li
                       key={b.id}
-                      className="flex justify-between items-center gap-2 bg-[var(--surface2)] rounded-xl px-3 py-2 text-sm"
+                      className="flex justify-between items-center gap-2 bg-[var(--bg)]/50 border border-[var(--border)]/60 rounded-xl px-3 py-2 text-sm"
                     >
                       <span className="flex items-center gap-2 min-w-0">
                         {thumb ? (
@@ -509,10 +622,10 @@ export function App() {
                         ) : (
                           <span>{b.emoji}</span>
                         )}
-                        <span className="truncate">{b.title}</span>
+                        <span className="truncate font-medium">{b.title}</span>
                       </span>
                       <span className="text-[var(--dim)] text-xs shrink-0">
-                        power {b.powerAtFed} → {b.powerNow} · {secs > 0 ? `${secs}s` : "digesting…"}
+                        pwr {b.powerAtFed} → {b.powerNow} · {secs > 0 ? `${secs}s` : "digesting…"}
                       </span>
                     </li>
                   );
@@ -526,26 +639,29 @@ export function App() {
             {m.stage >= 3 ? (
               <div>
                 <h3 className="font-pixel text-xs mb-2">NOSTALGIA — DISPLAY OLDER LOOK</h3>
-                <div className="flex gap-2 flex-wrap">
+                <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
                   {STAGES.filter((s) => s.stage <= m.stage).map((st) => (
                     <button
                       type="button"
                       key={st.stage}
                       onClick={() => stageMut.mutate(st.stage)}
-                      className={`px-3 py-1.5 rounded-full text-sm border ${
+                      className={`p-2 rounded-xl border text-center ${
                         m.displayStage === st.stage
-                          ? "bg-[var(--accent)] text-black font-bold"
-                          : "border-[var(--border)]"
+                          ? "bg-[var(--accent)]/20 border-[var(--accent)] text-[var(--accent)] font-bold"
+                          : "border-[var(--border)] bg-[var(--bg)]/40"
                       }`}
                     >
-                      {st.stage} {st.name}
+                      <div className="w-12 h-12 mx-auto">
+                        <MemeMonster displayStage={st.stage} actualStage={m.stage} mood="happy" />
+                      </div>
+                      <span className="text-[11px] block mt-1">{st.name}</span>
                     </button>
                   ))}
                 </div>
               </div>
             ) : (
               <p className="text-xs text-[var(--dim)]">
-                🔒 Nostalgia toggle unlocks at Stage 3 (Beast) — display any earlier evolution's look while keeping Stage 5 aura.
+                🔒 Nostalgia toggle unlocks at Stage 3 (Beast) — display any earlier look while keeping your Stage 5 aura.
               </p>
             )}
             <div className="flex gap-2">
@@ -554,13 +670,13 @@ export function App() {
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
                 placeholder={`Rename ${m.name}…`}
-                className="flex-1 min-w-0 bg-[var(--surface2)] border border-[var(--border)] rounded-xl px-3 py-2 text-sm"
+                className="flex-1 min-w-0 bg-[var(--bg)]/60 border border-[var(--border)] rounded-xl px-3 py-2 text-sm"
               />
               <button
                 type="button"
                 disabled={!newName.trim() || renameMut.isPending}
                 onClick={() => renameMut.mutate(newName)}
-                className="px-4 py-2 rounded-xl bg-[var(--accent)] text-black font-bold text-sm disabled:opacity-40"
+                className="px-4 py-2 rounded-xl bg-[var(--accent)] text-[#141026] font-bold text-sm disabled:opacity-40"
               >
                 Save
               </button>
@@ -570,17 +686,17 @@ export function App() {
                 <button
                   type="button"
                   onClick={() => setResetArmed(true)}
-                  className="text-xs text-[var(--dim)] hover:text-red-300 underline"
+                  className="text-xs text-[var(--dim)] hover:text-rose-300 underline"
                 >
                   Reset Pet
                 </button>
               ) : (
                 <div className="flex items-center gap-2 text-xs">
-                  <span className="text-red-300">Hatch a fresh Blob?</span>
+                  <span className="text-rose-300">Hatch a fresh Blob?</span>
                   <button
                     type="button"
                     onClick={() => resetMut.mutate()}
-                    className="px-2.5 py-1 rounded-lg bg-red-600 text-white font-bold"
+                    className="px-2.5 py-1 rounded-lg bg-rose-600 text-white font-bold"
                   >
                     Confirm Reset
                   </button>
@@ -610,7 +726,7 @@ export function App() {
               <h3 className="font-pixel text-xs mb-2">SECRET MOVES ({view.secrets.length}/10)</h3>
               {view.secrets.length === 0 ? (
                 <p className="text-sm text-[var(--dim)]">
-                  None yet. Hint: type a famous meme phrase as a custom label on any meme — or say it to {m.name}! 👀
+                  None yet. Type a famous meme phrase as a custom label on any meme — or say it to {m.name}! 👀
                 </p>
               ) : (
                 <ul className="text-sm space-y-1.5">
@@ -622,7 +738,7 @@ export function App() {
                 </ul>
               )}
               <p className="text-xs text-[var(--dim)] mt-2">
-                Digestion milestones: 5 / 15 / 30 lifetime digestions (you're at {m.digestedCount}).
+                Digestion milestones: 5 / 15 / 30 lifetime digestions (currently {m.digestedCount}).
               </p>
             </div>
           </section>
@@ -631,98 +747,142 @@ export function App() {
 
       {tab === "feed" && (
         <main className="px-4 pt-4 max-w-2xl mx-auto">
-          <div className="flex items-end justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <h2 className="font-pixel text-xl">MEME FEED</h2>
-            <span className="text-sm panel border border-[var(--border)] rounded-full px-3 py-1">
-              🗳️ {votesLeft}/{view.voteBudget} votes left
-            </span>
+            <div className="flex items-center gap-2 text-xs">
+              <span className="panel border border-[var(--border)] rounded-full px-3 py-1 font-bold">
+                🫃 Belly {view.belly.length}/{m.memeSlots}
+              </span>
+              <span className="panel border border-[var(--border)] rounded-full px-3 py-1 font-bold">
+                🗳️ {votesLeft}/{view.voteBudget} votes
+              </span>
+            </div>
           </div>
           <p className="text-sm text-[var(--dim)] mt-1">
-            Label memes to grow their power — tasty +2, spicy +3 (adds Heat!), blech −1. Eat early for viral backflow!
+            Label memes to grow power — tasty +2, spicy +3 (adds Heat!), blech −1. Eat early for viral backflow.
           </p>
 
-          {/* Post a Meme (Real <= 5MB File Upload OR Template) */}
-          <form
-            className="mt-4 rounded-2xl panel border border-[var(--border)] p-4 space-y-3"
-            onSubmit={(e) => {
-              e.preventDefault();
-              if (postTitle.trim()) postMut.mutate();
-            }}
-          >
-            <div className="flex items-center justify-between gap-2">
-              <h3 className="font-pixel text-xs">DROP YOUR OWN MEME</h3>
-              <label className="px-3 py-1.5 rounded-xl bg-[var(--surface2)] border border-[var(--border)] text-xs font-bold cursor-pointer hover:border-[var(--accent)]">
-                {uploading ? "Uploading…" : "📤 Upload Image (≤5 MB)"}
-                <input
-                  type="file"
-                  accept="image/jpeg,image/png,image/gif,image/webp"
-                  className="hidden"
-                  onChange={(e) => void handleFileChange(e.target.files?.[0])}
-                />
-              </label>
-            </div>
-
-            {uploadedUrl ? (
-              <div className="relative rounded-xl overflow-hidden border-2 border-[var(--accent)]">
-                <img src={uploadedUrl} alt="Uploaded meme preview" className="w-full h-44 object-cover" />
+          {/* Filter pills + Collapsible Meme Composer button */}
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+            <div className="flex flex-wrap gap-1.5">
+              {(
+                [
+                  ["all", "All"],
+                  ["hot", "🔥 Hot"],
+                  ["tasty", "😋 Tasty"],
+                  ["spicy", "🌶️ Spicy"],
+                  ["fresh", "✨ Fresh"],
+                ] as const
+              ).map(([key, lbl]) => (
                 <button
+                  key={key}
                   type="button"
-                  onClick={() => setUploadedUrl(null)}
-                  className="absolute top-2 right-2 px-2 py-1 rounded-lg bg-black/80 text-xs text-white"
+                  onClick={() => setFeedFilter(key)}
+                  className={`px-3 py-1 rounded-full text-xs font-bold border ${
+                    feedFilter === key
+                      ? "bg-[var(--accent)] text-[#141026] border-[var(--accent)]"
+                      : "bg-[var(--surface)] border-[var(--border)] text-[var(--dim)]"
+                  }`}
                 >
-                  ✕ Use template instead
+                  {lbl}
                 </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={() => setComposerOpen((o) => !o)}
+              className="px-3.5 py-1.5 rounded-xl bg-[var(--accent2)] text-[#141026] font-bold text-xs"
+            >
+              {composerOpen ? "✕ Close" : "＋ Drop a Meme"}
+            </button>
+          </div>
+
+          {composerOpen && (
+            <form
+              className="mt-3 rounded-2xl panel border border-[var(--accent)]/50 p-4 space-y-3"
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (postTitle.trim()) postMut.mutate();
+              }}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <h3 className="font-pixel text-xs">DROP YOUR OWN MEME</h3>
+                <label className="px-3 py-1.5 rounded-xl bg-[var(--bg)]/60 border border-[var(--border)] text-xs font-bold cursor-pointer hover:border-[var(--accent)]">
+                  {uploading ? "Uploading…" : "📤 Upload Image (≤5 MB)"}
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/gif,image/webp"
+                    className="hidden"
+                    onChange={(e) => void handleFileChange(e.target.files?.[0])}
+                  />
+                </label>
               </div>
-            ) : (
-              <div className="grid grid-cols-3 gap-2" role="radiogroup" aria-label="Meme template photo">
-                {MEME_TEMPLATES.map((t) => (
+
+              {uploadedUrl ? (
+                <div className="relative rounded-xl overflow-hidden border-2 border-[var(--accent)]">
+                  <img src={uploadedUrl} alt="Uploaded meme preview" className="w-full h-44 object-cover" />
                   <button
                     type="button"
-                    key={t.key}
-                    role="radio"
-                    aria-checked={postImageKey === t.key}
-                    onClick={() => setPostImageKey(t.key)}
-                    className={`rounded-xl overflow-hidden border-2 text-left ${
-                      postImageKey === t.key
-                        ? "border-[var(--accent)] ring-2 ring-[var(--accent)]/40"
-                        : "border-[var(--border)] opacity-80"
-                    }`}
+                    onClick={() => setUploadedUrl(null)}
+                    className="absolute top-2 right-2 px-2 py-1 rounded-lg bg-black/80 text-xs text-white"
                   >
-                    <img src={MEME_IMAGES[t.key]} alt={t.name} className="w-full h-16 object-cover" loading="lazy" />
-                    <span className="block text-[10px] font-bold px-1.5 py-1 truncate">
-                      {t.emoji} {t.name}
-                    </span>
+                    ✕ Use template instead
                   </button>
-                ))}
-              </div>
-            )}
+                </div>
+              ) : (
+                <div className="grid grid-cols-3 gap-2" role="radiogroup" aria-label="Meme template photo">
+                  {MEME_TEMPLATES.map((t) => (
+                    <button
+                      type="button"
+                      key={t.key}
+                      role="radio"
+                      aria-checked={postImageKey === t.key}
+                      onClick={() => setPostImageKey(t.key)}
+                      className={`rounded-xl overflow-hidden border-2 text-left ${
+                        postImageKey === t.key
+                          ? "border-[var(--accent)] ring-2 ring-[var(--accent)]/40"
+                          : "border-[var(--border)] opacity-80"
+                      }`}
+                    >
+                      <img src={MEME_IMAGES[t.key]} alt={t.name} className="w-full h-16 object-cover" loading="lazy" />
+                      <span className="block text-[10px] font-bold px-1.5 py-1 truncate">
+                        {t.emoji} {t.name}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
 
-            <input
-              aria-label="Meme title"
-              value={postTitle}
-              onChange={(e) => setPostTitle(e.target.value)}
-              placeholder="Meme title…"
-              className="w-full bg-[var(--surface2)] border border-[var(--border)] rounded-xl px-3 py-2 text-sm"
-            />
-            <input
-              aria-label="Meme caption"
-              value={postCaption}
-              onChange={(e) => setPostCaption(e.target.value)}
-              placeholder="Caption (optional)…"
-              className="w-full bg-[var(--surface2)] border border-[var(--border)] rounded-xl px-3 py-2 text-sm"
-            />
-            <button
-              type="submit"
-              disabled={!postTitle.trim() || postMut.isPending || uploading}
-              className="w-full py-2.5 rounded-xl bg-[var(--accent)] text-black font-bold disabled:opacity-40"
-            >
-              Post to feed
-            </button>
-          </form>
+              <input
+                aria-label="Meme title"
+                value={postTitle}
+                onChange={(e) => setPostTitle(e.target.value)}
+                placeholder="Meme title…"
+                className="w-full bg-[var(--bg)]/60 border border-[var(--border)] rounded-xl px-3 py-2 text-sm"
+              />
+              <input
+                aria-label="Meme caption"
+                value={postCaption}
+                onChange={(e) => setPostCaption(e.target.value)}
+                placeholder="Caption (optional)…"
+                className="w-full bg-[var(--bg)]/60 border border-[var(--border)] rounded-xl px-3 py-2 text-sm"
+              />
+              <button
+                type="submit"
+                disabled={!postTitle.trim() || postMut.isPending || uploading}
+                className="w-full py-2.5 rounded-xl bg-[var(--accent)] text-[#141026] font-bold disabled:opacity-40"
+              >
+                Post to feed
+              </button>
+            </form>
+          )}
 
           {/* Feed List */}
           <div className="mt-4 space-y-3">
-            {view.memes.map((meme) => {
+            {filteredMemes.length === 0 && (
+              <p className="text-center text-sm text-[var(--dim)] py-8">No memes match this filter yet.</p>
+            )}
+            {filteredMemes.map((meme) => {
               const imgSrc = resolveMemeImage(meme);
               return (
                 <article key={meme.id} className="rounded-2xl border border-[var(--border)] overflow-hidden panel">
@@ -730,11 +890,11 @@ export function App() {
                     <img src={imgSrc} alt={`Meme: ${meme.title}`} className="w-full h-56 object-cover" loading="lazy" />
                   )}
                   <div className="p-4 flex gap-3" style={{ background: meme.bg }}>
-                    <div className="text-black min-w-0">
+                    <div className="text-[#1e1b4b] min-w-0">
                       <h3 className="font-bold leading-tight">
                         {meme.emoji} {meme.title}{" "}
                         {meme.isFresh && (
-                          <span className="text-[10px] bg-lime-600 text-white px-1.5 py-0.5 rounded-full align-middle">
+                          <span className="text-[10px] bg-emerald-600 text-white px-1.5 py-0.5 rounded-full align-middle">
                             FRESH +1
                           </span>
                         )}
@@ -744,12 +904,12 @@ export function App() {
                           </span>
                         )}
                       </h3>
-                      <p className="text-sm text-black/70">{meme.caption}</p>
+                      <p className="text-sm text-[#1e1b4b]/75">{meme.caption}</p>
                     </div>
                     <div className="ml-auto text-right shrink-0">
-                      <div className="font-pixel text-black text-lg">{meme.power}</div>
-                      <div className="text-[10px] text-black/60 font-bold">
-                        POWER · {meme.dominant.toUpperCase()}
+                      <div className="font-pixel text-[#1e1b4b] text-lg">{meme.power}</div>
+                      <div className="text-[10px] text-[#1e1b4b]/65 font-bold">
+                        PWR · {meme.dominant.toUpperCase()}
                       </div>
                     </div>
                   </div>
@@ -759,7 +919,7 @@ export function App() {
                         type="button"
                         disabled={meme.votedToday || voteMut.isPending}
                         onClick={() => voteMut.mutate({ memeId: meme.id, label: "tasty" })}
-                        className="px-3 py-1.5 rounded-full bg-lime-500/20 border border-lime-500/50 disabled:opacity-40"
+                        className="px-3 py-1.5 rounded-full bg-emerald-500/20 border border-emerald-400/50 disabled:opacity-40"
                       >
                         😋 tasty · {meme.tasty}
                       </button>
@@ -767,7 +927,7 @@ export function App() {
                         type="button"
                         disabled={meme.votedToday || voteMut.isPending}
                         onClick={() => voteMut.mutate({ memeId: meme.id, label: "spicy" })}
-                        className="px-3 py-1.5 rounded-full bg-red-500/20 border border-red-500/50 disabled:opacity-40"
+                        className="px-3 py-1.5 rounded-full bg-rose-500/20 border border-rose-400/50 disabled:opacity-40"
                       >
                         🌶️ spicy · {meme.spicy}
                       </button>
@@ -775,7 +935,7 @@ export function App() {
                         type="button"
                         disabled={meme.votedToday || voteMut.isPending}
                         onClick={() => voteMut.mutate({ memeId: meme.id, label: "blech" })}
-                        className="px-3 py-1.5 rounded-full bg-zinc-500/20 border border-zinc-500/50 disabled:opacity-40"
+                        className="px-3 py-1.5 rounded-full bg-violet-500/20 border border-violet-400/50 disabled:opacity-40"
                       >
                         🤢 blech · {meme.blech}
                       </button>
@@ -790,7 +950,7 @@ export function App() {
                         type="button"
                         disabled={feedMemeMut.isPending}
                         onClick={() => feedMemeMut.mutate(meme.id)}
-                        className="px-3 py-1.5 rounded-full bg-[var(--accent)] text-black font-bold disabled:opacity-40"
+                        className="px-3.5 py-1.5 rounded-full bg-[var(--accent)] text-[#141026] font-bold disabled:opacity-40"
                       >
                         🍽️ Feed it
                       </button>
@@ -798,7 +958,7 @@ export function App() {
                         <button
                           type="button"
                           onClick={() => reportMemeMut.mutate(meme.id)}
-                          className="ml-auto px-2 py-1 text-xs text-[var(--dim)] hover:text-red-300"
+                          className="ml-auto px-2 py-1 text-xs text-[var(--dim)] hover:text-rose-300"
                           title="Report meme (3 reports auto-hide)"
                         >
                           🚩
@@ -811,13 +971,13 @@ export function App() {
                         {meme.customLabels.map((lbl) => (
                           <span
                             key={lbl.id}
-                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[var(--surface2)] border border-[var(--border)]"
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[var(--bg)]/60 border border-[var(--border)]"
                           >
                             #{lbl.text}
                             <button
                               type="button"
                               onClick={() => reportLabelMut.mutate(lbl.id)}
-                              className="opacity-60 hover:opacity-100 hover:text-red-300"
+                              className="opacity-60 hover:opacity-100 hover:text-rose-300"
                               title="Report label"
                             >
                               ×
@@ -832,7 +992,7 @@ export function App() {
                         value={labelDrafts[meme.id] ?? ""}
                         onChange={(e) => setLabelDrafts((d) => ({ ...d, [meme.id]: e.target.value }))}
                         placeholder="Add a custom label… (psst, secret words hide here)"
-                        className="flex-1 min-w-0 bg-[var(--surface2)] border border-[var(--border)] rounded-xl px-3 py-1.5 text-sm"
+                        className="flex-1 min-w-0 bg-[var(--bg)]/60 border border-[var(--border)] rounded-xl px-3 py-1.5 text-sm"
                       />
                       <button
                         type="button"
@@ -874,7 +1034,7 @@ export function App() {
               disabled={Boolean(trainBlockReason)}
               onClick={() => setGame("dodge")}
               className={`flex-1 py-3 rounded-2xl border font-bold disabled:opacity-40 ${
-                game === "dodge" ? "bg-[var(--accent)] text-black" : "bg-[var(--surface)] border-[var(--border)]"
+                game === "dodge" ? "bg-[var(--accent)] text-[#141026]" : "bg-[var(--surface)] border-[var(--border)]"
               }`}
             >
               🏃 Meme Dodge
@@ -887,7 +1047,7 @@ export function App() {
                 setGame("match");
               }}
               className={`flex-1 py-3 rounded-2xl border font-bold disabled:opacity-40 ${
-                game === "match" ? "bg-[var(--accent)] text-black" : "bg-[var(--surface)] border-[var(--border)]"
+                game === "match" ? "bg-[var(--accent)] text-[#141026]" : "bg-[var(--surface)] border-[var(--border)]"
               }`}
             >
               🧩 Label Match
@@ -897,6 +1057,9 @@ export function App() {
           <div className="mt-4 rounded-2xl panel border border-[var(--border)] p-4">
             {game === "dodge" && (
               <MemeDodge
+                displayStage={m.displayStage}
+                actualStage={m.stage}
+                equipped={view.equippedItems}
                 dogeSpeed={m.activeBuffs.dogeSpeed}
                 susSense={m.activeBuffs.susSense}
                 onDone={(score) => finishGameMut.mutate({ game: "dodge", score })}
@@ -911,77 +1074,117 @@ export function App() {
             )}
             {!game && (
               <p className="text-[var(--dim)] text-sm text-center py-8">
-                Pick a game above to start training {m.name}.
+                Pick a mini-game above to start training {m.name}.
               </p>
             )}
           </div>
 
+          {/* Visual 5-Stage Evolution Road */}
           <div className="mt-4 rounded-2xl panel border border-[var(--border)] p-4">
-            <h3 className="font-pixel text-xs mb-2">EVOLUTION ROAD</h3>
-            <ol className="space-y-1.5 text-sm">
-              {STAGES.map((st) => (
-                <li
-                  key={st.stage}
-                  className={`flex justify-between ${
-                    m.stage >= st.stage ? "text-[var(--accent)] font-bold" : "text-[var(--dim)]"
-                  }`}
-                >
-                  <span>
-                    {m.stage >= st.stage ? "✅" : "🔒"} Stage {st.stage} — {st.name}
-                  </span>
-                  <span>{st.xp.toLocaleString()} XP</span>
-                </li>
-              ))}
-            </ol>
+            <h3 className="font-pixel text-xs mb-3">EVOLUTION ROAD</h3>
+            <div className="grid grid-cols-5 gap-2">
+              {STAGES.map((st) => {
+                const unlocked = m.stage >= st.stage;
+                const current = m.stage === st.stage;
+                return (
+                  <div
+                    key={st.stage}
+                    className={`rounded-xl p-2 border text-center ${
+                      current
+                        ? "border-[var(--accent)] bg-[var(--accent)]/15"
+                        : unlocked
+                          ? "border-[var(--accent2)]/50 bg-[var(--bg)]/50"
+                          : "border-[var(--border)] bg-[var(--bg)]/30 opacity-55"
+                    }`}
+                  >
+                    <div className={`w-14 h-14 mx-auto ${unlocked ? "" : "grayscale contrast-50"}`}>
+                      <MemeMonster displayStage={st.stage} actualStage={st.stage} mood="happy" />
+                    </div>
+                    <p className="text-[10px] font-bold mt-1 leading-tight break-words">{st.name}</p>
+                    <p className="text-[10px] text-[var(--dim)]">{st.xp.toLocaleString()} XP</p>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </main>
       )}
 
       {tab === "dress" && (
         <main className="px-4 pt-4 max-w-2xl mx-auto">
-          <h2 className="font-pixel text-xl">DRIP SHOP</h2>
+          <div className="flex items-center justify-between gap-2">
+            <h2 className="font-pixel text-xl">DRIP SHOP</h2>
+            <span className="panel border border-[var(--border)] rounded-full px-3 py-1 text-sm font-bold">
+              💧 {m.drip} Drip
+            </span>
+          </div>
           <p className="text-sm text-[var(--dim)] mt-1">
-            Balance: 💧 <b>{m.drip} Drip</b> — cosmetics only, never pay-to-win. First wear of each outfit grants +5 Happiness.
+            Cosmetics only, never pay-to-win. First wear of each outfit grants +5 Happiness!
           </p>
-          <div className="mt-3 rounded-[1.6rem] p-3 viewport-screen" style={{ backgroundColor: "var(--viewport)" }}>
+
+          <div
+            className="mt-3 rounded-[1.6rem] p-3 viewport-screen border-2 border-[var(--border)]"
+            style={{ background: sky.bg }}
+          >
             <MonsterSVG
               displayStage={m.displayStage}
               actualStage={m.stage}
-              mood={m.mood}
+              mood="excited"
               sleeping={false}
               roasted={m.isRoasted}
               equipped={view.equippedItems}
             />
           </div>
-          <div className="mt-4 grid grid-cols-2 gap-3">
-            {view.cosmetics.map((c) => (
-              <div key={c.id} className="rounded-2xl panel border border-[var(--border)] p-3">
-                <div className="flex items-start justify-between">
-                  <span className="text-4xl">{c.emoji}</span>
+
+          {/* Slot filter tabs */}
+          <div className="mt-4 flex flex-wrap gap-1.5">
+            {(["all", "head", "face", "body", "back", "sticker"] as const).map((sl) => (
+              <button
+                key={sl}
+                type="button"
+                onClick={() => setSlotFilter(sl)}
+                className={`px-3 py-1 rounded-full text-xs font-bold capitalize border ${
+                  slotFilter === sl
+                    ? "bg-[var(--accent)] text-[#141026] border-[var(--accent)]"
+                    : "bg-[var(--surface)] border-[var(--border)] text-[var(--dim)]"
+                }`}
+              >
+                {sl}
+              </button>
+            ))}
+          </div>
+
+          <div className="mt-3 grid grid-cols-2 gap-3">
+            {filteredCosmetics.map((c) => (
+              <div key={c.id} className="rounded-2xl panel border border-[var(--border)] p-3 flex flex-col">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="w-14 h-14 rounded-xl bg-white/90 border border-[#282b47]/20 flex items-center justify-center p-1">
+                    <CosmeticBadge assetId={c.id} size={46} />
+                  </div>
                   {!c.wornBefore && (
                     <span className="text-[10px] px-2 py-0.5 rounded-full bg-pink-500/20 text-pink-200 border border-pink-400/40">
                       +5 💛 1st wear
                     </span>
                   )}
                 </div>
-                <p className="font-bold text-sm mt-1">{c.name}</p>
+                <p className="font-bold text-sm mt-2">{c.name}</p>
                 <p className="text-xs text-[var(--dim)] capitalize">{c.slot} slot</p>
                 {c.owned ? (
                   <button
                     type="button"
                     onClick={() => equipMut.mutate(c.id)}
-                    className={`mt-2 w-full py-2 rounded-xl font-bold text-sm ${
-                      c.equipped ? "bg-[var(--accent2)] text-black" : "bg-[var(--accent)] text-black"
+                    className={`mt-2.5 w-full py-2 rounded-xl font-bold text-sm ${
+                      c.equipped ? "bg-[var(--accent2)] text-[#141026]" : "bg-[var(--accent)] text-[#141026]"
                     }`}
                   >
-                    {c.equipped ? "Wearing ✓ — tap to remove" : "Equip"}
+                    {c.equipped ? "Wearing ✓ — remove" : "Equip"}
                   </button>
                 ) : (
                   <button
                     type="button"
                     disabled={m.drip < c.price || buyMut.isPending}
                     onClick={() => buyMut.mutate(c.id)}
-                    className="mt-2 w-full py-2 rounded-xl bg-[var(--surface2)] border border-[var(--border)] font-bold text-sm disabled:opacity-40"
+                    className="mt-2.5 w-full py-2 rounded-xl bg-[var(--bg)]/70 border border-[var(--border)] font-bold text-sm disabled:opacity-40"
                   >
                     Buy · 💧{c.price}
                   </button>
@@ -1010,7 +1213,10 @@ export function App() {
               type="button"
               key={t}
               aria-current={tab === t ? "page" : undefined}
-              onClick={() => setTab(t)}
+              onClick={() => {
+                sfx.tap(soundOn);
+                setTab(t);
+              }}
               className={`py-2 text-center ${tab === t ? "text-[var(--accent)]" : "text-[var(--dim)]"}`}
             >
               <span className={`inline-block px-4 py-0.5 rounded-full text-xl leading-6 ${tab === t ? "bg-[var(--accent)]/20" : ""}`}>

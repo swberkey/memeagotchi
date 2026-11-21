@@ -9,6 +9,7 @@ fs.mkdirSync(scopeDir, { recursive: true });
 const links = [
   ["game-core", path.join(root, "packages", "game-core")],
   ["rpc-sdk", path.join(root, "packages", "rpc-sdk")],
+  ["monster-ui", path.join(root, "packages", "monster-ui")],
   ["server", path.join(root, "apps", "server")],
 ];
 

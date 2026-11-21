@@ -20,15 +20,24 @@ import {
   toGameView,
   updateSettings,
   voteMeme,
+  type GameState,
   type GameView,
 } from "@memeagotchi/game-core";
 import { defineAction, s, type ActionsModule } from "@memeagotchi/rpc-sdk";
-import type { GameRepository } from "./db.ts";
-import type { UploadStore } from "./uploads.ts";
+
+export interface StateRepo {
+  load(nowMs: number): GameState;
+  save(state: GameState, nowMs: number): void;
+  audit(actionName: string, ok: boolean, summary: string, nowMs: number): void;
+}
+
+export interface UrlUploader {
+  fetchAndSaveUrl(rawUrl: string): Promise<{ imageUrl: string; suggestedTitle: string }>;
+}
 
 export interface ServerCtx {
-  repo: GameRepository;
-  uploads: UploadStore;
+  repo: StateRepo;
+  uploads: UrlUploader;
   now: () => number;
 }
 
