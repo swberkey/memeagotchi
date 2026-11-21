@@ -40,7 +40,7 @@ export class GameRepository {
       .get() as { state_json?: string } | undefined;
 
     if (!row?.state_json) {
-      const fresh = createFreshState(nowMs, 60);
+      const fresh = createFreshState(nowMs, 60, { hatched: false });
       this.save(fresh, nowMs);
       return fresh;
     }

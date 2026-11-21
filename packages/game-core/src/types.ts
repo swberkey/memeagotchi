@@ -1,8 +1,22 @@
 export type Label = "tasty" | "spicy" | "blech";
 export type CareAction = "feed" | "groom" | "play" | "sleep" | "wake";
-export type MiniGameId = "dodge" | "match";
+export type MiniGameId = "runner" | "blaster" | "beat";
 export type CosmeticSlot = "head" | "face" | "body" | "back" | "sticker";
 export type ClockRate = 1 | 60;
+
+export type SpeciesId =
+  | "mint-dragon"
+  | "spicy-imp"
+  | "cyber-cat"
+  | "cozy-frog"
+  | "cursed-ghost";
+
+export type SpecialMoveId =
+  | "bubble-shield"
+  | "fire-dash"
+  | "glitch-blink"
+  | "zen-slow"
+  | "phantom-phase";
 
 export type Mood =
   | "happy"
@@ -15,6 +29,63 @@ export type Mood =
   | "sad"
   | "hangry"
   | "roasted";
+
+export interface SpeciesArchetype {
+  readonly fullnessDecayMul: number;
+  readonly happinessDecayMul: number;
+  readonly hygieneDecayMul: number;
+  readonly energyDecayMul: number;
+  readonly sleepRestoreMul: number;
+  readonly kibbleMul: number;
+  readonly heatCap: number;
+  readonly roastedResetHeat: number;
+  readonly tastyMul: number;
+  readonly spicyMul: number;
+  readonly blechMul: number;
+  readonly dripMul: number;
+  readonly miniGameScoreMul: number;
+}
+
+export interface SpeciesDef {
+  readonly id: SpeciesId;
+  readonly name: string;
+  readonly defaultPetName: string;
+  readonly title: string;
+  readonly tagline: string;
+  readonly accentColor: string;
+  readonly secondaryColor: string;
+  readonly eggColors: readonly [string, string, string];
+  readonly statBars: {
+    readonly speed: number;
+    readonly stamina: number;
+    readonly spice: number;
+    readonly luck: number;
+  };
+  readonly perkSummary: string;
+  readonly tradeoffSummary: string;
+  readonly specialMove: {
+    readonly id: SpecialMoveId;
+    readonly name: string;
+    readonly description: string;
+  };
+  readonly archetype: SpeciesArchetype;
+  readonly voiceLines: {
+    readonly hatch: string;
+    readonly feed: string;
+    readonly play: string;
+    readonly banter: readonly string[];
+  };
+}
+
+export interface MiniGameDef {
+  readonly id: MiniGameId;
+  readonly name: string;
+  readonly shortName: string;
+  readonly glyph: string;
+  readonly genre: string;
+  readonly tagline: string;
+  readonly controls: string;
+}
 
 export interface StageDef {
   readonly stage: number;
@@ -134,27 +205,33 @@ export interface FeedEventRecord {
 }
 
 export interface ActiveBuffs {
-  /** Market Manipulation (`stonks`): +25% training XP until timestamp */
   stonksUntilReal: number;
-  /** Cap Breaker (`no cap`): stat cap = 105 until timestamp */
   noCapUntilReal: number;
-  /** Based Boost (`based and correct`): next digestion power grant x2 */
   basedBoostReady: boolean;
-  /** Never Gonna Give You Up (`rickroll`): auto-recover from Roasted once */
   rickrollSaveReady: boolean;
-  /** Ratio Shield (`l + ratio`): immune to one blech penalty */
   ratioShieldReady: boolean;
+}
+
+export interface CareStreakState {
+  count: number;
+  lastCareDate: string | null;
+  bestStreak: number;
+}
+
+export interface HighScoreEntry {
+  bestScore: number;
+  bestCombo: number;
+  plays: number;
 }
 
 export interface GameState {
   version: number;
+  hatched: boolean;
+  species: SpeciesId;
   name: string;
   xp: number;
-  /** Actual unlocked evolution stage (1..5); frozen when happiness === 0 */
   stage: number;
-  /** Nostalgia visual look (1..stage); Stage 5 aura stays tied to `stage` */
   displayStage: number;
-  /** Floating-point internal stats (rounded only in view projection) */
   fullness: number;
   happiness: number;
   hygiene: number;
@@ -173,6 +250,8 @@ export interface GameState {
   lastPlayReal: number;
   lastSleepReal: number;
   digestedCount: number;
+  careStreak: CareStreakState;
+  highScores: Record<MiniGameId, HighScoreEntry>;
   belly: BellyItem[];
   digestedHistory: DigestedRecord[];
   memes: MemeRecord[];
@@ -201,9 +280,23 @@ export interface TimingConfig {
   xpMultiplier: number;
 }
 
+export interface MilestonePowers {
+  /** 5 digested: Species X Special recharges 35% faster */
+  turboCharge: boolean;
+  /** 15 digested: 1 automatic free hit-shield per mini-game run */
+  secondWind: boolean;
+  /** 30 digested: Start every mini-game with x1.5 Overdrive multiplier */
+  memeOverdrive: boolean;
+}
+
 export interface GameView {
+  hatched: boolean;
+  speciesCatalog: readonly SpeciesDef[];
+  miniGames: readonly MiniGameDef[];
   monster: {
     name: string;
+    species: SpeciesId;
+    speciesDef: SpeciesDef;
     xp: number;
     stage: number;
     stageName: string;
@@ -216,12 +309,16 @@ export interface GameView {
     hygiene: number;
     energy: number;
     heat: number;
+    heatCap: number;
     statCap: number;
     drip: number;
     isSleeping: boolean;
     isRoasted: boolean;
     roastedLeftSec: number;
     digestedCount: number;
+    careStreak: CareStreakState;
+    highScores: Record<MiniGameId, HighScoreEntry>;
+    milestonePowers: MilestonePowers;
     memeSlots: number;
     voteBudget: number;
     mood: Mood;

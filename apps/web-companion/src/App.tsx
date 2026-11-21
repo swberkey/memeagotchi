@@ -1,17 +1,20 @@
 import {
+  MINI_GAMES_CATALOG,
   STAGES,
   type CosmeticSlot,
   type GameView,
   type Label,
   type MemeImageKey,
+  type MiniGameId,
+  type SpeciesId,
 } from "@memeagotchi/game-core";
 import { CosmeticBadge, MemeMonster } from "@memeagotchi/monster-ui";
+import { ArcadeGamepad, SnesArcadeCanvas, createGamepadController } from "@memeagotchi/snes-games";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, uploadMemeFile } from "./api";
-import { LabelMatch } from "./components/LabelMatch";
-import { MemeDodge } from "./components/MemeDodge";
 import { MonsterSVG } from "./components/MonsterSVG";
+import { TitleHatchScreen } from "./components/TitleHatchScreen";
 import { MEME_IMAGES, MEME_TEMPLATES, resolveMemeImage } from "./memeImages";
 import { sfx } from "./sound";
 
@@ -91,8 +94,10 @@ export function App() {
   const [toast, setToast] = useState("");
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const [game, setGame] = useState<"dodge" | "match" | null>(null);
-  const [matchRunId, setMatchRunId] = useState(1);
+  const [showTitle, setShowTitle] = useState(false);
+  const [game, setGame] = useState<MiniGameId | null>("runner");
+  const [gameResultBanner, setGameResultBanner] = useState("");
+  const gamepad = useMemo(() => createGamepadController(), []);
   const [newName, setNewName] = useState("");
   const [talkDraft, setTalkDraft] = useState("");
 
@@ -236,11 +241,22 @@ export function App() {
     },
     onError: (e: Error) => showToast(e.message),
   });
-  const finishGameMut = useMutation({
-    mutationFn: (args: { game: "dodge" | "match"; score: number }) => api.completeMiniGame(args),
+  const hatchMut = useMutation({
+    mutationFn: (args: { species: SpeciesId; name: string }) => api.hatchStarter(args),
     onSuccess: (r) => {
       applyView(r);
-      if (game === "dodge") setGame(null);
+      if (r.ok) {
+        setShowTitle(false);
+        setTab("home");
+      }
+    },
+    onError: (e: Error) => showToast(e.message),
+  });
+  const finishGameMut = useMutation({
+    mutationFn: (args: { game: MiniGameId; score: number; maxCombo: number }) => api.completeMiniGame(args),
+    onSuccess: (r) => {
+      applyView(r);
+      setGameResultBanner(r.message);
     },
     onError: (e: Error) => showToast(e.message),
   });
@@ -264,6 +280,7 @@ export function App() {
     mutationFn: () => api.resetPet({}),
     onSuccess: (r) => {
       setResetArmed(false);
+      setShowTitle(true);
       applyView(r);
     },
   });
@@ -310,6 +327,20 @@ export function App() {
     );
   }
 
+  if (!view.hatched || showTitle) {
+    return (
+      <TitleHatchScreen
+        view={view}
+        handheldUrl={HANDHELD_URL}
+        hatching={hatchMut.isPending}
+        onContinue={() => setShowTitle(false)}
+        onHatch={(species, name) => hatchMut.mutate({ species, name })}
+        onToggleClock={() => settingsMut.mutate({ clock: view.settings.clock === 60 ? 1 : 60 })}
+        onToggleSound={() => settingsMut.mutate({ soundOn: !soundOn })}
+      />
+    );
+  }
+
   const m = view.monster;
   const elapsedSinceServer = Math.max(0, Math.floor((nowSec - view.serverNow) / 1000));
   const feedCd = Math.max(0, m.cooldowns.feedSec - elapsedSinceServer);
@@ -351,8 +382,23 @@ export function App() {
       {/* Top sync & simulator bar */}
       <header className="sticky top-0 z-30 bg-[var(--bg)]/90 backdrop-blur border-b border-[var(--border)]">
         <div className="max-w-2xl mx-auto px-4 py-2 flex items-center justify-between gap-2 text-xs">
-          <div className="flex items-center gap-2 min-w-0">
-            <span className="font-pixel text-[var(--accent)] text-sm truncate">MEMEAGOTCHI</span>
+          <div className="flex items-center gap-1.5 min-w-0">
+            <button
+              type="button"
+              onClick={() => setShowTitle(true)}
+              className="font-pixel text-[var(--accent)] text-sm truncate hover:brightness-110"
+              title="Open Title Screen & Starter Picker"
+            >
+              MEMEAGOTCHI
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowTitle(true)}
+              className="px-2 py-1 rounded-full bg-[var(--surface2)] border border-[var(--border)] text-[11px] font-bold hover:border-[var(--accent)]"
+              title="Title Screen / Switch Starter"
+            >
+              🏠 Title
+            </button>
             <button
               type="button"
               onClick={() => settingsMut.mutate({ clock: view.settings.clock === 60 ? 1 : 60 })}
@@ -377,18 +423,21 @@ export function App() {
             rel="noreferrer"
             className="px-2.5 py-1 rounded-full bg-[#ffd23f] text-[#141026] font-bold text-[11px] hover:brightness-110 shrink-0"
           >
-            📟 Handheld Sim ↗
+            📟 280×240 Sim ↗
           </a>
         </div>
       </header>
 
       {toast && (
-        <div
-          className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 max-w-[92vw] bg-[#100c20]/95 text-white text-sm px-4 py-2.5 rounded-2xl border-2 border-[var(--accent)] shadow-2xl"
+        <button
+          type="button"
+          onClick={() => setToast("")}
+          className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 max-w-[90vw] bg-[#100c20]/95 text-white text-xs px-3.5 py-2 rounded-2xl border-2 border-[var(--accent)] shadow-2xl text-center"
           role="status"
+          title="Click to dismiss"
         >
           {toast}
-        </div>
+        </button>
       )}
 
       {tab === "home" && (
@@ -423,6 +472,8 @@ export function App() {
 
               <div className="relative">
                 <MonsterSVG
+                  species={m.species}
+                  name={m.name}
                   displayStage={m.displayStage}
                   actualStage={m.stage}
                   mood={displayMood}
@@ -440,13 +491,16 @@ export function App() {
                 {m.moodLabel}
               </p>
               <p className={`relative text-center text-xs ${sky.textDark ? "text-[#282b47]/65" : "text-white/70"}`}>
-                Actual stage: {m.stage} {m.stageName} · {m.digestedCount} digested · tap {m.name} to pet!
+                {m.speciesDef.name} · Stage {m.stage} {m.stageName} · {m.digestedCount} digested · tap {m.name} to pet!
               </p>
             </div>
 
-            <div className="flex justify-between items-center px-2.5 py-2 text-white text-sm font-bold">
+            <div className="flex flex-wrap justify-between items-center gap-2 px-2.5 py-2 text-white text-sm font-bold">
               <span>💧 {m.drip} Drip</span>
-              <span>🌡️ Heat {m.heat}/100</span>
+              <span>🌡️ Heat {m.heat}/{m.heatCap}</span>
+              <span title={`Best streak: ${m.careStreak.bestStreak} days`}>
+                🔥 {m.careStreak.count}d Streak
+              </span>
               <span>⭐ {m.xp.toLocaleString()} XP</span>
             </div>
             <div className="px-2 pb-1">
@@ -456,9 +510,14 @@ export function App() {
                   style={{ width: `${xpPct}%`, background: "linear-gradient(90deg, #7be6d8, #fde047)" }}
                 />
               </div>
-              <p className="text-white/85 text-[11px] mt-1">
-                {m.nextStageXp ? `${(m.nextStageXp - m.xp).toLocaleString()} XP to ${m.nextStageName}` : "Max evolution reached 👑"}
-              </p>
+              <div className="flex items-center justify-between gap-2 text-white/85 text-[11px] mt-1">
+                <span>
+                  {m.nextStageXp ? `${(m.nextStageXp - m.xp).toLocaleString()} XP to ${m.nextStageName}` : "Max evolution reached 👑"}
+                </span>
+                <span className="font-bold text-[#fde047] truncate">
+                  X: {m.speciesDef.specialMove.name}
+                </span>
+              </div>
             </div>
           </div>
 
@@ -652,7 +711,7 @@ export function App() {
                       }`}
                     >
                       <div className="w-12 h-12 mx-auto">
-                        <MemeMonster displayStage={st.stage} actualStage={m.stage} mood="happy" />
+                        <MemeMonster species={m.species} displayStage={st.stage} actualStage={m.stage} mood="happy" />
                       </div>
                       <span className="text-[11px] block mt-1">{st.name}</span>
                     </button>
@@ -1012,76 +1071,160 @@ export function App() {
       )}
 
       {tab === "train" && (
-        <main className="px-4 pt-4 max-w-2xl mx-auto">
-          <h2 className="font-pixel text-xl">TRAINING</h2>
-          <p className="text-sm text-[var(--dim)] mt-1">
-            Mini-games cost <b>5 Energy</b> and grant <b>+20 Happiness</b> plus XP &amp; Drip (×{view.settings.xpMultiplier} XP in current clock mode).
-          </p>
+        <main className="px-4 pt-4 max-w-2xl mx-auto space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h2 className="font-pixel text-xl">SNES ARCADE · 280×240</h2>
+              <p className="text-sm text-[var(--dim)] mt-0.5">
+                Cost <b>5 Energy</b> → <b>+20 Happiness</b> + XP &amp; Drip (×{view.settings.xpMultiplier} XP · {m.speciesDef.name} special: <b>{m.speciesDef.specialMove.name}</b>).
+              </p>
+            </div>
+            <span className="panel border border-[var(--border)] rounded-full px-3 py-1 text-xs font-bold text-[#fde047]">
+              🔥 {m.careStreak.count}d Streak Bonus
+            </span>
+          </div>
+
           {m.fullness > 0 && m.fullness < 30 && (
-            <p className="mt-2 text-xs text-amber-300 font-bold">
+            <p className="text-xs text-amber-300 font-bold">
               🍖 Low Fullness (&lt; 30): training XP is halved until you feed {m.name}.
             </p>
           )}
           {trainBlockReason && (
-            <div className="mt-3 rounded-2xl border border-amber-500/50 bg-amber-500/10 p-3 text-sm text-amber-200">
+            <div className="rounded-2xl border border-amber-500/50 bg-amber-500/10 p-3 text-sm text-amber-200">
               ⚠️ {trainBlockReason}
             </div>
           )}
 
-          <div className="flex gap-2 mt-4">
-            <button
-              type="button"
-              disabled={Boolean(trainBlockReason)}
-              onClick={() => setGame("dodge")}
-              className={`flex-1 py-3 rounded-2xl border font-bold disabled:opacity-40 ${
-                game === "dodge" ? "bg-[var(--accent)] text-[#141026]" : "bg-[var(--surface)] border-[var(--border)]"
-              }`}
-            >
-              🏃 Meme Dodge
-            </button>
-            <button
-              type="button"
-              disabled={Boolean(trainBlockReason)}
-              onClick={() => {
-                setMatchRunId((n) => n + 1);
-                setGame("match");
-              }}
-              className={`flex-1 py-3 rounded-2xl border font-bold disabled:opacity-40 ${
-                game === "match" ? "bg-[var(--accent)] text-[#141026]" : "bg-[var(--surface)] border-[var(--border)]"
-              }`}
-            >
-              🧩 Label Match
-            </button>
+          {/* Active 5 / 15 / 30 Digestion Milestone Powers */}
+          <section aria-label="Digestion Milestone Powers" className="grid grid-cols-3 gap-2">
+            {[
+              {
+                req: 5,
+                unlocked: m.milestonePowers.turboCharge,
+                icon: "⚡",
+                name: "Turbo Charge",
+                desc: "X Special recharges 35% faster",
+              },
+              {
+                req: 15,
+                unlocked: m.milestonePowers.secondWind,
+                icon: "🛡️",
+                name: "Second Wind",
+                desc: "1 free hit-shield per run",
+              },
+              {
+                req: 30,
+                unlocked: m.milestonePowers.memeOverdrive,
+                icon: "🔥",
+                name: "Overdrive ×1.5",
+                desc: "Start every game at ×1.5 score",
+              },
+            ].map((pw) => (
+              <div
+                key={pw.req}
+                className={`rounded-2xl p-2.5 border text-left ${
+                  pw.unlocked
+                    ? "bg-[var(--accent)]/15 border-[var(--accent)]"
+                    : "bg-[var(--surface)]/70 border-[var(--border)] opacity-70"
+                }`}
+              >
+                <div className="flex items-center justify-between text-xs font-bold">
+                  <span>
+                    {pw.icon} {pw.name}
+                  </span>
+                  <span className={pw.unlocked ? "text-emerald-300" : "text-[var(--dim)]"}>
+                    {pw.unlocked ? "ON" : `${Math.min(m.digestedCount, pw.req)}/${pw.req}`}
+                  </span>
+                </div>
+                <p className="text-[10px] text-[var(--dim)] mt-1 leading-snug">{pw.desc}</p>
+              </div>
+            ))}
+          </section>
+
+          {/* 3 SNES Game Cards with Personal Bests */}
+          <div className="grid grid-cols-3 gap-2">
+            {MINI_GAMES_CATALOG.map((g) => {
+              const hs = m.highScores[g.id];
+              const active = game === g.id;
+              return (
+                <button
+                  key={g.id}
+                  type="button"
+                  disabled={Boolean(trainBlockReason)}
+                  onClick={() => {
+                    setGame(g.id);
+                    setGameResultBanner("");
+                  }}
+                  className={`p-3 rounded-2xl border-2 text-left transition-all disabled:opacity-40 ${
+                    active
+                      ? "bg-[var(--accent)]/20 border-[var(--accent)] shadow-lg"
+                      : "bg-[var(--surface)] border-[var(--border)] hover:border-[var(--accent2)]"
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-lg">{g.glyph}</span>
+                    <span className="text-[10px] font-bold text-[#fde047]">BEST {hs.bestScore}</span>
+                  </div>
+                  <p className="font-pixel text-xs mt-1 leading-tight">{g.shortName}</p>
+                  <p className="text-[10px] text-[var(--dim)] mt-0.5 leading-tight">
+                    Max ×{hs.bestCombo} · {hs.plays} plays
+                  </p>
+                </button>
+              );
+            })}
           </div>
 
-          <div className="mt-4 rounded-2xl panel border border-[var(--border)] p-4">
-            {game === "dodge" && (
-              <MemeDodge
-                displayStage={m.displayStage}
-                actualStage={m.stage}
-                equipped={view.equippedItems}
-                dogeSpeed={m.activeBuffs.dogeSpeed}
-                susSense={m.activeBuffs.susSense}
-                onDone={(score) => finishGameMut.mutate({ game: "dodge", score })}
-              />
-            )}
-            {game === "match" && (
-              <LabelMatch
-                key={matchRunId}
-                susSense={m.activeBuffs.susSense}
-                onDone={(score) => finishGameMut.mutate({ game: "match", score })}
-              />
-            )}
-            {!game && (
+          {/* 280x240 SNES Screen + On-Screen D-Pad + O / X / -- Gamepad */}
+          <div className="rounded-3xl panel border-2 border-[var(--border)] p-4 space-y-3">
+            {game && !trainBlockReason ? (
+              <>
+                <div className="max-w-[440px] mx-auto rounded-[24px] p-2 bg-[#0d0c1d] border-4 border-[#3f336d] shadow-2xl">
+                  <div className="rounded-[18px] overflow-hidden">
+                    <SnesArcadeCanvas
+                      game={game}
+                      species={m.species}
+                      stage={m.displayStage}
+                      equippedIds={view.equippedItems.map((i) => i.assetId)}
+                      soundOn={soundOn}
+                      milestonePowers={m.milestonePowers}
+                      buffs={{
+                        dogeSpeed: m.activeBuffs.dogeSpeed,
+                        susSense: m.activeBuffs.susSense,
+                        chadStrength: m.activeBuffs.chadStrength,
+                      }}
+                      bestScore={m.highScores[game].bestScore}
+                      controller={gamepad}
+                      resultBanner={gameResultBanner}
+                      onComplete={({ game: gId, score, maxCombo }) =>
+                        finishGameMut.mutate({ game: gId, score, maxCombo })
+                      }
+                      onExit={() => setGame(null)}
+                    />
+                  </div>
+                </div>
+
+                <div className="max-w-[440px] mx-auto">
+                  <ArcadeGamepad
+                    controller={gamepad}
+                    specialLabel={m.speciesDef.specialMove.name}
+                  />
+                  <p className="text-[11px] text-center text-[var(--dim)] mt-2">
+                    Keys: <b>Arrows/WASD</b> D-Pad · <b>Z/Space</b> O · <b>X/Shift</b> Special · <b>P/Esc</b> --
+                  </p>
+                </div>
+              </>
+            ) : (
               <p className="text-[var(--dim)] text-sm text-center py-8">
-                Pick a mini-game above to start training {m.name}.
+                {trainBlockReason
+                  ? "Take care of your monster first to unlock the 280×240 SNES Arcade!"
+                  : `Pick one of the 3 SNES cartridges above to train ${m.name}!`}
               </p>
             )}
           </div>
 
           {/* Visual 5-Stage Evolution Road */}
-          <div className="mt-4 rounded-2xl panel border border-[var(--border)] p-4">
-            <h3 className="font-pixel text-xs mb-3">EVOLUTION ROAD</h3>
+          <div className="rounded-2xl panel border border-[var(--border)] p-4">
+            <h3 className="font-pixel text-xs mb-3">EVOLUTION ROAD · {m.speciesDef.name.toUpperCase()}</h3>
             <div className="grid grid-cols-5 gap-2">
               {STAGES.map((st) => {
                 const unlocked = m.stage >= st.stage;
@@ -1098,7 +1241,7 @@ export function App() {
                     }`}
                   >
                     <div className={`w-14 h-14 mx-auto ${unlocked ? "" : "grayscale contrast-50"}`}>
-                      <MemeMonster displayStage={st.stage} actualStage={st.stage} mood="happy" />
+                      <MemeMonster species={m.species} displayStage={st.stage} actualStage={st.stage} mood="happy" />
                     </div>
                     <p className="text-[10px] font-bold mt-1 leading-tight break-words">{st.name}</p>
                     <p className="text-[10px] text-[var(--dim)]">{st.xp.toLocaleString()} XP</p>
@@ -1127,6 +1270,8 @@ export function App() {
             style={{ background: sky.bg }}
           >
             <MonsterSVG
+              species={m.species}
+              name={m.name}
               displayStage={m.displayStage}
               actualStage={m.stage}
               mood="excited"

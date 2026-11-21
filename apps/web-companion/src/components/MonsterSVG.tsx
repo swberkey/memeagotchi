@@ -1,4 +1,4 @@
-import type { Mood } from "@memeagotchi/game-core";
+import type { Mood, SpeciesId } from "@memeagotchi/game-core";
 import { MemeMonster, type EquippedDisplayItem } from "@memeagotchi/monster-ui";
 import { useState } from "react";
 
@@ -7,6 +7,8 @@ export type { EquippedDisplayItem };
 const HEART_OFFSETS = ["-34px", "0px", "34px", "-18px", "22px"];
 
 export function MonsterSVG({
+  species = "mint-dragon",
+  name = "your pet",
   displayStage,
   actualStage,
   mood,
@@ -15,6 +17,8 @@ export function MonsterSVG({
   equipped,
   onPet,
 }: {
+  species?: SpeciesId;
+  name?: string;
   displayStage: number;
   actualStage: number;
   mood: Mood;
@@ -48,7 +52,7 @@ export function MonsterSVG({
             }
           : undefined
       }
-      title={onPet ? "Tap to pet Mochi!" : undefined}
+      title={onPet ? `Tap to pet ${name}!` : undefined}
       className={`relative mx-auto w-[216px] h-[206px] select-none ${onPet ? "cursor-pointer" : ""}`}
     >
       <div
@@ -58,6 +62,7 @@ export function MonsterSVG({
         }`}
       >
         <MemeMonster
+          species={species}
           displayStage={displayStage}
           actualStage={actualStage}
           mood={visualMood}
@@ -65,7 +70,7 @@ export function MonsterSVG({
         />
       </div>
 
-      {/* Floating heart/sparkle burst when player taps Mochi */}
+      {/* Floating heart/sparkle burst when player taps their monster */}
       {petBurstId > 0 && (
         <div key={petBurstId} className="pointer-events-none absolute inset-0" aria-hidden>
           {HEART_OFFSETS.map((dx, i) => (

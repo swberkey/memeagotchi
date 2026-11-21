@@ -14,9 +14,9 @@
     "dev:server": "node scripts/link-workspaces.mjs && npm run dev -w @memeagotchi/server",
     "dev:web": "npm run dev -w @memeagotchi/web-companion",
     "dev:sim": "npm run dev -w @memeagotchi/handheld-sim",
-    "build": "npm run build -w @memeagotchi/game-core && npm run build -w @memeagotchi/rpc-sdk && npm run build -w @memeagotchi/monster-ui && npm run build -w @memeagotchi/web-companion && npm run build -w @memeagotchi/handheld-sim && npm run build -w @memeagotchi/server",
+    "build": "npm run build -w @memeagotchi/game-core && npm run build -w @memeagotchi/rpc-sdk && npm run build -w @memeagotchi/monster-ui && npm run build -w @memeagotchi/snes-games && npm run build -w @memeagotchi/web-companion && npm run build -w @memeagotchi/handheld-sim && npm run build -w @memeagotchi/server",
     "start": "npm run start -w @memeagotchi/server",
-    "typecheck": "npm run typecheck -w @memeagotchi/game-core && npm run typecheck -w @memeagotchi/rpc-sdk && npm run typecheck -w @memeagotchi/monster-ui && npm run typecheck -w @memeagotchi/server && npm run typecheck -w @memeagotchi/web-companion && npm run typecheck -w @memeagotchi/handheld-sim",
+    "typecheck": "npm run typecheck -w @memeagotchi/game-core && npm run typecheck -w @memeagotchi/rpc-sdk && npm run typecheck -w @memeagotchi/monster-ui && npm run typecheck -w @memeagotchi/snes-games && npm run typecheck -w @memeagotchi/server && npm run typecheck -w @memeagotchi/web-companion && npm run typecheck -w @memeagotchi/handheld-sim",
     "test": "node scripts/run-tests.mjs",
     "check": "npm run typecheck && npm test && npm run build"
   },

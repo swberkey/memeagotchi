@@ -10,6 +10,7 @@ const links = [
   ["game-core", path.join(root, "packages", "game-core")],
   ["rpc-sdk", path.join(root, "packages", "rpc-sdk")],
   ["monster-ui", path.join(root, "packages", "monster-ui")],
+  ["snes-games", path.join(root, "packages", "snes-games")],
   ["server", path.join(root, "apps", "server")],
 ];
 

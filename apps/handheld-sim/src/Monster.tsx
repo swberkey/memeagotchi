@@ -1,19 +1,21 @@
-import type { Mood } from "@memeagotchi/game-core";
+import type { Mood, SpeciesId } from "@memeagotchi/game-core";
 import { MemeMonster, type EquippedDisplayItem } from "@memeagotchi/monster-ui";
 
 export type EquippedItem = EquippedDisplayItem;
 
 /**
- * Handheld 192x192 monster renderer — delegates directly to the unified
- * @memeagotchi/monster-ui mint/lavender 5-stage + 12-cosmetic character kit
- * so Companion and Handheld look 100% cohesive.
+ * Handheld 280x240 landscape monster renderer — delegates directly to the unified
+ * @memeagotchi/monster-ui 5-species × 5-stage + 12-cosmetic character kit
+ * so Companion and Handheld stay 100% cohesive.
  */
 export function Monster({
+  species = "mint-dragon",
   stage,
   actualStage,
   mood,
   equipped,
 }: {
+  species?: SpeciesId;
   stage: number;
   actualStage?: number;
   mood: Mood;
@@ -21,6 +23,7 @@ export function Monster({
 }) {
   return (
     <MemeMonster
+      species={species}
       displayStage={stage}
       actualStage={actualStage ?? stage}
       mood={mood}

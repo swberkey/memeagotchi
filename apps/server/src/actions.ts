@@ -7,6 +7,7 @@ import {
   createFreshState,
   equipCosmetic,
   feedMeme,
+  hatchStarter,
   MEME_IMAGE_KEYS,
   postBonusMeme,
   postMeme,
@@ -15,6 +16,7 @@ import {
   reportMeme,
   setDisplayStage,
   shareMeme,
+  SPECIES_IDS,
   talkAction,
   tickState,
   toGameView,
@@ -60,6 +62,22 @@ export const Actions = {
       const { state, notes } = tickState(loaded, nowMs);
       ctx.repo.save(state, nowMs);
       return { view: toGameView(state, nowMs, notes) };
+    },
+  }),
+
+  hatchStarter: defineAction({
+    description: "Hatches a new active pet of the chosen starter species and name.",
+    request: s.object({
+      species: s.enum(SPECIES_IDS),
+      name: s.string().max(24).optional(),
+    }),
+    response: okViewResponse,
+    handler(ctx: ServerCtx, args) {
+      const nowMs = ctx.now();
+      const res = hatchStarter(ctx.repo.load(nowMs), args.species, args.name, nowMs);
+      ctx.repo.save(res.state, nowMs);
+      ctx.repo.audit("hatchStarter", res.ok, `${args.species}: ${res.message}`, nowMs);
+      return { ok: res.ok, message: res.message, view: toGameView(res.state, nowMs, res.notes) };
     },
   }),
 
@@ -272,21 +290,23 @@ export const Actions = {
   }),
 
   completeMiniGame: defineAction({
-    description: "Awards server-side XP, Drip, Happiness, and Energy for Meme Dodge or Label Match.",
+    description: "Awards server-side XP, Drip, Happiness, Energy, and high scores for Meme Runner DX, Troll Blaster, or Vibe Beat.",
     request: s.object({
-      game: s.enum(["dodge", "match"] as const),
-      score: s.number().int().min(0).max(500),
+      game: s.enum(["runner", "blaster", "beat"] as const),
+      score: s.number().int().min(0).max(9999),
+      maxCombo: s.number().int().min(0).max(999).default(0),
     }),
-    response: okViewResponse.extend({ xpGained: s.number(), dripGained: s.number() }),
+    response: okViewResponse.extend({ xpGained: s.number(), dripGained: s.number(), isNewBest: s.boolean() }),
     handler(ctx: ServerCtx, args) {
       const nowMs = ctx.now();
-      const res = completeMiniGame(ctx.repo.load(nowMs), args.game, args.score, nowMs);
+      const res = completeMiniGame(ctx.repo.load(nowMs), args.game, args.score, nowMs, args.maxCombo);
       ctx.repo.save(res.state, nowMs);
       return {
         ok: res.ok,
         message: res.message,
         xpGained: res.extra?.xpGained ?? 0,
         dripGained: res.extra?.dripGained ?? 0,
+        isNewBest: res.extra?.isNewBest ?? false,
         view: toGameView(res.state, nowMs, res.notes),
       };
     },
@@ -332,17 +352,17 @@ export const Actions = {
   }),
 
   resetPet: defineAction({
-    description: "Resets the pet to a freshly hatched Stage 1 Blob.",
+    description: "Resets the pet back to the Title Screen so a new starter species can be hatched.",
     request: s.object({}),
     response: okViewResponse,
     handler(ctx: ServerCtx) {
       const nowMs = ctx.now();
       const current = ctx.repo.load(nowMs);
-      const fresh = createFreshState(nowMs, current.clock);
+      const fresh = createFreshState(nowMs, current.clock, { hatched: false });
       fresh.soundOn = current.soundOn;
       ctx.repo.save(fresh, nowMs);
-      ctx.repo.audit("resetPet", true, "Pet reset", nowMs);
-      return { ok: true, message: "🥚 A new Mochi hatched!", view: toGameView(fresh, nowMs, []) };
+      ctx.repo.audit("resetPet", true, "Pet reset to Title Screen", nowMs);
+      return { ok: true, message: "🥚 Ready to hatch a new starter!", view: toGameView(fresh, nowMs, []) };
     },
   }),
 } satisfies ActionsModule<ServerCtx>;

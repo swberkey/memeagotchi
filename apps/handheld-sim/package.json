@@ -13,6 +13,7 @@
     "@memeagotchi/game-core": "1.0.0",
     "@memeagotchi/monster-ui": "1.0.0",
     "@memeagotchi/rpc-sdk": "1.0.0",
+    "@memeagotchi/snes-games": "1.0.0",
     "@tanstack/react-query": "^5.71.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0"

@@ -1,5 +1,7 @@
 @import url('https://fonts.googleapis.com/css2?family=Silkscreen:wght@400;700&display=swap');
 @import "tailwindcss";
+@source "../../../packages/snes-games/src";
+@source "../../../packages/monster-ui/src";
 
 @theme {
   --font-pixel: "Silkscreen", ui-monospace, monospace;

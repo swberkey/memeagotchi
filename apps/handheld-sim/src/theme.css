@@ -1,5 +1,7 @@
 @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap');
 @import "tailwindcss";
+@source "../../../packages/snes-games/src";
+@source "../../../packages/monster-ui/src";
 
 :root {
   color-scheme: dark;

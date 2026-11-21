@@ -1,6 +1,15 @@
-import type { BonusMemeDef, CosmeticDef, SecretMoveDef, SeedMemeDef, StageDef } from "./types.ts";
+import type {
+  BonusMemeDef,
+  CosmeticDef,
+  MiniGameDef,
+  SecretMoveDef,
+  SeedMemeDef,
+  SpeciesDef,
+  SpeciesId,
+  StageDef,
+} from "./types.ts";
 
-export const STATE_VERSION = 2;
+export const STATE_VERSION = 3;
 
 export const HOUR_MS = 3_600_000;
 export const DAY_MS = 24 * HOUR_MS;
@@ -13,11 +22,6 @@ export const NO_CAP_STAT_CAP = 105;
 export const OFFLINE_DECAY_FLOOR = 25;
 export const AUTO_HIDE_REPORT_THRESHOLD = 3;
 
-/**
- * Decay and recovery rates per game-hour.
- * Energy follows the Nov 17 playtest retuning (ADR-001):
- * awake −1/hr (was −4), sleeping +20/hr (was +10), play/mini-game −5 (was −15).
- */
 export const DECAY_RATES = {
   fullnessPerHour: 5,
   happinessPerHour: 3,
@@ -43,6 +47,275 @@ export const CARE_EFFECTS = {
   shareDrip: 3,
 } as const;
 
+export const SPECIES_IDS = [
+  "mint-dragon",
+  "spicy-imp",
+  "cyber-cat",
+  "cozy-frog",
+  "cursed-ghost",
+] as const;
+
+export const SPECIES_CATALOG: readonly SpeciesDef[] = [
+  {
+    id: "mint-dragon",
+    name: "Mint Dragon",
+    defaultPetName: "Mochi",
+    title: "Balanced Gummy Wyrm",
+    tagline: "Chill, bouncy, and always ready for a fresh meme snack.",
+    accentColor: "#7be6d8",
+    secondaryColor: "#c4b5fd",
+    eggColors: ["#b8fbf0", "#7be6d8", "#b7a6f3"],
+    statBars: { speed: 3, stamina: 4, spice: 3, luck: 3 },
+    perkSummary: "Balanced stats · +10% Tasty meme digestion XP & power",
+    tradeoffSummary: "No weak spots — true all-rounder",
+    specialMove: {
+      id: "bubble-shield",
+      name: "Bubble Shield",
+      description: "Wraps Mochi in a gummy bubble that blocks 1 hit & guards combos.",
+    },
+    archetype: {
+      fullnessDecayMul: 1.0,
+      happinessDecayMul: 1.0,
+      hygieneDecayMul: 1.0,
+      energyDecayMul: 1.0,
+      sleepRestoreMul: 1.0,
+      kibbleMul: 1.0,
+      heatCap: 100,
+      roastedResetHeat: 40,
+      tastyMul: 1.1,
+      spicyMul: 1.0,
+      blechMul: 1.0,
+      dripMul: 1.0,
+      miniGameScoreMul: 1.0,
+    },
+    voiceLines: {
+      hatch: "Boing! Feed me fresh memes!",
+      feed: "Nom. Peak gummy fuel.",
+      play: "BEST. DAY. EVER.",
+      banter: [
+        "Interesting. Feed it to me as a meme.",
+        "Noted. Anyway — memes?",
+        "Bold take. I respect it.",
+        "Minty fresh and ready to game!",
+      ],
+    },
+  },
+  {
+    id: "spicy-imp",
+    name: "Spicy Imp",
+    defaultPetName: "Scoville",
+    title: "High-Heat Pepper Gremlin",
+    tagline: "Eats viral fire memes for breakfast and thrives on chaos.",
+    accentColor: "#ff7849",
+    secondaryColor: "#fde047",
+    eggColors: ["#fed7aa", "#ff7849", "#dc2626"],
+    statBars: { speed: 4, stamina: 3, spice: 5, luck: 3 },
+    perkSummary: "120 Heat cap, cools faster · +20% Spicy meme XP",
+    tradeoffSummary: "Gets hungry 15% faster (high metabolism!)",
+    specialMove: {
+      id: "fire-dash",
+      name: "Fire Dash",
+      description: "Blazing invulnerable surge that incinerates nearby hazards & trolls.",
+    },
+    archetype: {
+      fullnessDecayMul: 1.15,
+      happinessDecayMul: 1.0,
+      hygieneDecayMul: 1.0,
+      energyDecayMul: 1.0,
+      sleepRestoreMul: 1.0,
+      kibbleMul: 1.0,
+      heatCap: 120,
+      roastedResetHeat: 25,
+      tastyMul: 1.0,
+      spicyMul: 1.2,
+      blechMul: 1.0,
+      dripMul: 1.0,
+      miniGameScoreMul: 1.05,
+    },
+    voiceLines: {
+      hatch: "SIZZLE! Bring me the SPICIEST memes!",
+      feed: "Needs hot sauce, but I'll eat it.",
+      play: "TOO HOT TO HANDLE!",
+      banter: [
+        "Turn up the heat! Where's the spicy feed?",
+        "Scoville rating: MAXIMUM.",
+        "Let's blast some trolls right now!",
+        "My flames burn brighter on viral drama.",
+      ],
+    },
+  },
+  {
+    id: "cyber-cat",
+    name: "Cyber Cat",
+    defaultPetName: "Pixel",
+    title: "Overclocked Glitch Kitty",
+    tagline: "Speedrunner energy with neon ears and frame-perfect combos.",
+    accentColor: "#38bdf8",
+    secondaryColor: "#e879f9",
+    eggColors: ["#bae6fd", "#38bdf8", "#c084fc"],
+    statBars: { speed: 5, stamina: 2, spice: 3, luck: 4 },
+    perkSummary: "+15% SNES mini-game score & XP payout",
+    tradeoffSummary: "Burns awake Energy 15% faster (overclocked!)",
+    specialMove: {
+      id: "glitch-blink",
+      name: "Glitch Blink",
+      description: "Phase-teleports past danger and triggers a cyber score burst.",
+    },
+    archetype: {
+      fullnessDecayMul: 1.0,
+      happinessDecayMul: 1.0,
+      hygieneDecayMul: 0.95,
+      energyDecayMul: 1.15,
+      sleepRestoreMul: 1.0,
+      kibbleMul: 1.0,
+      heatCap: 100,
+      roastedResetHeat: 40,
+      tastyMul: 1.0,
+      spicyMul: 1.0,
+      blechMul: 1.0,
+      dripMul: 1.05,
+      miniGameScoreMul: 1.15,
+    },
+    voiceLines: {
+      hatch: "BOOT COMPLETE. Meow.exe online!",
+      feed: "Downloading kibble packets… 100%.",
+      play: "60 FPS PURR-FECTION!",
+      banter: [
+        "New personal best incoming, nyah.",
+        "Have you tried overclocking the memes?",
+        "Purr.exe running at 280×240.",
+        "Wait till you see my Glitch Blink!",
+      ],
+    },
+  },
+  {
+    id: "cozy-frog",
+    name: "Cozy Frog",
+    defaultPetName: "Pebbles",
+    title: "Unbothered Sprout Amphibian",
+    tagline: "Moisturized, thriving, in his lilypad lane with endless stamina.",
+    accentColor: "#86efac",
+    secondaryColor: "#fef08a",
+    eggColors: ["#dcfce7", "#86efac", "#f9a8d4"],
+    statBars: { speed: 2, stamina: 5, spice: 3, luck: 4 },
+    perkSummary: "25% slower Energy drain · +20% Kibble & Sleep recovery",
+    tradeoffSummary: "Relaxed base tempo (relies on Zen Slow timing)",
+    specialMove: {
+      id: "zen-slow",
+      name: "Zen Slow",
+      description: "Slows incoming hazards/notes to bullet-time & grabs bonus points.",
+    },
+    archetype: {
+      fullnessDecayMul: 0.9,
+      happinessDecayMul: 0.9,
+      hygieneDecayMul: 0.9,
+      energyDecayMul: 0.75,
+      sleepRestoreMul: 1.2,
+      kibbleMul: 1.2,
+      heatCap: 100,
+      roastedResetHeat: 35,
+      tastyMul: 1.05,
+      spicyMul: 1.0,
+      blechMul: 1.0,
+      dripMul: 1.0,
+      miniGameScoreMul: 1.0,
+    },
+    voiceLines: {
+      hatch: "Ribbit… cozy vibes achieved.",
+      feed: "Mmm. Wholesome kibble.",
+      play: "Hop hop! Pure serotonin.",
+      banter: [
+        "No thoughts, just lilypads and memes.",
+        "Hydrate, touch grass, feed frog.",
+        "Take a deep breath. Now press O.",
+        "We're vibing at maximum chill.",
+      ],
+    },
+  },
+  {
+    id: "cursed-ghost",
+    name: "Cursed Ghost",
+    defaultPetName: "Wisp",
+    title: "Chaos Spirit of Bad Memes",
+    tagline: "Turns cringe blech memes into pure Drip and ghostly wealth.",
+    accentColor: "#d8b4fe",
+    secondaryColor: "#2dd4bf",
+    eggColors: ["#f3e8ff", "#c4b5fd", "#2dd4bf"],
+    statBars: { speed: 4, stamina: 3, spice: 3, luck: 5 },
+    perkSummary: "+50% Blech meme power · +25% Drip from games & digestion",
+    tradeoffSummary: "Gets moody 15% faster if ignored (needs attention!)",
+    specialMove: {
+      id: "phantom-phase",
+      name: "Phantom Phase",
+      description: "Turns briefly intangible while haunting enemies for bonus points.",
+    },
+    archetype: {
+      fullnessDecayMul: 0.95,
+      happinessDecayMul: 1.15,
+      hygieneDecayMul: 0.9,
+      energyDecayMul: 0.95,
+      sleepRestoreMul: 1.0,
+      kibbleMul: 1.0,
+      heatCap: 100,
+      roastedResetHeat: 40,
+      tastyMul: 1.0,
+      spicyMul: 1.0,
+      blechMul: 1.5,
+      dripMul: 1.25,
+      miniGameScoreMul: 1.05,
+    },
+    voiceLines: {
+      hatch: "Boo~! Got any cursed memes?",
+      feed: "Ectoplasm restored. Spooky.",
+      play: "Ehehehe! Hauntingly fun!",
+      banter: [
+        "Feed me your worst blech memes. I love trash.",
+        "Oooooh~ your Drip balance is rising~",
+        "Don't ghost me or I'll mope!",
+        "Certified cursed energy detected.",
+      ],
+    },
+  },
+] as const;
+
+export const SPECIES_BY_ID: Record<SpeciesId, SpeciesDef> = {
+  "mint-dragon": SPECIES_CATALOG[0]!,
+  "spicy-imp": SPECIES_CATALOG[1]!,
+  "cyber-cat": SPECIES_CATALOG[2]!,
+  "cozy-frog": SPECIES_CATALOG[3]!,
+  "cursed-ghost": SPECIES_CATALOG[4]!,
+};
+
+export const MINI_GAMES_CATALOG: readonly MiniGameDef[] = [
+  {
+    id: "runner",
+    name: "Meme Runner DX",
+    shortName: "RUNNER DX",
+    glyph: "🏃",
+    genre: "SNES Side-Scrolling Platformer",
+    tagline: "Leap floating meme clouds, stomp bad labels & snatch Tasty orbs!",
+    controls: "D-Pad Move/Duck · O Jump/Double-Jump · X Species Special · -- Pause",
+  },
+  {
+    id: "blaster",
+    name: "Troll Blaster",
+    shortName: "BLASTER",
+    glyph: "💥",
+    genre: "4-Way Top-Down Arena Shooter",
+    tagline: "Dodge and blast waves of Cringe Trolls & Bosses in a 280×240 arena!",
+    controls: "D-Pad 8-Way Move · O Fire Meme Orbs · X Species Special · -- Pause",
+  },
+  {
+    id: "beat",
+    name: "Vibe Beat",
+    shortName: "VIBE BEAT",
+    glyph: "🎵",
+    genre: "SNES Chiptune Rhythm Stage",
+    tagline: "Hit incoming arrows & O/X notes on the beat while your monster dances!",
+    controls: "D-Pad Arrows + O / X on Beat · -- Pause",
+  },
+] as const;
+
 export const STAGES: readonly StageDef[] = [
   { stage: 1, name: "Blob", shortName: "BLOB", xp: 0 },
   { stage: 2, name: "Critter", shortName: "CRIT", xp: 500 },
@@ -63,7 +336,7 @@ export const LAUNCH_SECRET_WORDS: Record<string, SecretMoveDef> = {
   doge: {
     word: "doge",
     move: "Much Speed",
-    effect: "Meme Dodge time +30%",
+    effect: "Mini-game time / speed bonus +30%",
     line: "wow. much speed. very fast.",
   },
   chad: {

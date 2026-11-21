@@ -10,8 +10,11 @@ import {
   HOUR_MS,
   LAUNCH_SECRET_WORDS,
   LONG_OFFLINE_GAME_MS,
+  MINI_GAMES_CATALOG,
   OFFLINE_DECAY_FLOOR,
   SEED_MEMES,
+  SPECIES_BY_ID,
+  SPECIES_CATALOG,
   STATE_VERSION,
 } from "./constants.ts";
 import {
@@ -39,9 +42,13 @@ import type {
   EngineResult,
   GameState,
   GameView,
+  HighScoreEntry,
   Label,
   MemeRecord,
+  MilestonePowers,
   MiniGameId,
+  SpeciesDef,
+  SpeciesId,
 } from "./types.ts";
 
 function cloneState(s: GameState): GameState {
@@ -54,6 +61,10 @@ function allocId(s: GameState): number {
   return id;
 }
 
+function speciesOf(s: Pick<GameState, "species">): SpeciesDef {
+  return SPECIES_BY_ID[s.species] ?? SPECIES_BY_ID["mint-dragon"];
+}
+
 function pushEvent(s: GameState, text: string, nowMs: number): void {
   s.events.unshift({ id: allocId(s), text, createdAtReal: nowMs });
   if (s.events.length > 24) s.events.length = 24;
@@ -64,11 +75,26 @@ function say(s: GameState, nowMs: number, text: string, durationMs = 6000): void
   s.speechUntilReal = nowMs + durationMs;
 }
 
+function freshHighScores(): Record<MiniGameId, HighScoreEntry> {
+  return {
+    runner: { bestScore: 0, bestCombo: 0, plays: 0 },
+    blaster: { bestScore: 0, bestCombo: 0, plays: 0 },
+    beat: { bestScore: 0, bestCombo: 0, plays: 0 },
+  };
+}
+
+export function milestonePowersFor(digestedCount: number): MilestonePowers {
+  return {
+    turboCharge: digestedCount >= 5,
+    secondWind: digestedCount >= 15,
+    memeOverdrive: digestedCount >= 30,
+  };
+}
+
 function awardXp(s: GameState, rawXp: number, nowMs: number, notes: string[]): number {
   if (rawXp <= 0) return 0;
   const gained = Math.round(rawXp);
   s.xp += gained;
-  // GDD §2: Happiness === 0 freezes evolution until recovered.
   if (Math.round(s.happiness) <= 0) {
     return gained;
   }
@@ -76,7 +102,6 @@ function awardXp(s: GameState, rawXp: number, nowMs: number, notes: string[]): n
   if (targetStage > s.stage) {
     const wasUsingLatestLook = s.displayStage === s.stage;
     s.stage = targetStage;
-    // Automatically advance look unless user explicitly selected an older nostalgia look at Stage 3+
     if (wasUsingLatestLook || targetStage < 3) {
       s.displayStage = targetStage;
     }
@@ -106,7 +131,43 @@ function maybeUnfreezeEvolution(s: GameState, nowMs: number, notes: string[]): v
   }
 }
 
-export function createFreshState(nowMs: number, clock: ClockRate = 60): GameState {
+function updateCareStreak(s: GameState, nowMs: number, notes: string[]): void {
+  const today = utcDateKey(nowMs);
+  if (s.careStreak.lastCareDate === today) return;
+
+  const yesterday = utcDateKey(nowMs - DAY_MS);
+  const nextCount = s.careStreak.lastCareDate === yesterday ? s.careStreak.count + 1 : 1;
+  s.careStreak.count = nextCount;
+  s.careStreak.lastCareDate = today;
+  s.careStreak.bestStreak = Math.max(s.careStreak.bestStreak, nextCount);
+
+  if (nextCount >= 2) {
+    const mult = Math.min(7, nextCount);
+    const sp = speciesOf(s);
+    const dripBonus = Math.round(10 * mult * sp.archetype.dripMul);
+    const xpBonus = awardXp(s, 15 * mult, nowMs, notes);
+    s.drip += dripBonus;
+    const msg = `🔥 ${nextCount}-day Care Streak! +${dripBonus} Drip, +${xpBonus} XP`;
+    notes.push(msg);
+    pushEvent(s, msg, nowMs);
+  }
+}
+
+export interface FreshStateOptions {
+  species?: SpeciesId;
+  name?: string;
+  hatched?: boolean;
+}
+
+export function createFreshState(
+  nowMs: number,
+  clock: ClockRate = 60,
+  options: FreshStateOptions = {},
+): GameState {
+  const speciesId: SpeciesId = options.species ?? "mint-dragon";
+  const sp = SPECIES_BY_ID[speciesId] ?? SPECIES_BY_ID["mint-dragon"];
+  const petName = options.name?.trim() || sp.defaultPetName;
+  const hatched = options.hatched ?? true;
   const bornGameMs = nowMs * clock;
   let nextId = 1;
   const memes: MemeRecord[] = SEED_MEMES.map((m, i) => ({
@@ -132,7 +193,9 @@ export function createFreshState(nowMs: number, clock: ClockRate = 60): GameStat
 
   return {
     version: STATE_VERSION,
-    name: "Mochi",
+    hatched,
+    species: speciesId,
+    name: petName,
     xp: 0,
     stage: 1,
     displayStage: 1,
@@ -154,6 +217,8 @@ export function createFreshState(nowMs: number, clock: ClockRate = 60): GameStat
     lastPlayReal: 0,
     lastSleepReal: 0,
     digestedCount: 0,
+    careStreak: { count: 0, lastCareDate: null, bestStreak: 0 },
+    highScores: freshHighScores(),
     belly: [],
     digestedHistory: [],
     memes,
@@ -170,8 +235,8 @@ export function createFreshState(nowMs: number, clock: ClockRate = 60): GameStat
     ownedCosmetics: [],
     firstWornCosmetics: [],
     equipped: {},
-    events: [{ id: nextId++, text: "🥚 Mochi hatched!", createdAtReal: nowMs }],
-    speech: "Feed me memes!",
+    events: [{ id: nextId++, text: `🥚 ${petName} (${sp.name}) hatched!`, createdAtReal: nowMs }],
+    speech: sp.voiceLines.hatch,
     speechUntilReal: nowMs + 8000,
     clock,
     soundOn: true,
@@ -180,14 +245,31 @@ export function createFreshState(nowMs: number, clock: ClockRate = 60): GameStat
 }
 
 export function normalizeState(raw: Partial<GameState>, nowMs: number): GameState {
-  const base = createFreshState(nowMs, raw.clock === 1 ? 1 : 60);
+  const species: SpeciesId =
+    raw.species && raw.species in SPECIES_BY_ID ? raw.species : "mint-dragon";
+  const base = createFreshState(nowMs, raw.clock === 1 ? 1 : 60, {
+    species,
+    name: raw.name,
+    hatched: raw.hatched ?? true,
+  });
   const s: GameState = {
     ...base,
     ...raw,
     version: STATE_VERSION,
+    hatched: raw.hatched ?? true,
+    species,
     buffs: {
       ...base.buffs,
       ...(raw.buffs ?? {}),
+    },
+    careStreak: {
+      ...base.careStreak,
+      ...(raw.careStreak ?? {}),
+    },
+    highScores: {
+      runner: { ...base.highScores.runner, ...(raw.highScores?.runner ?? {}) },
+      blaster: { ...base.highScores.blaster, ...(raw.highScores?.blaster ?? {}) },
+      beat: { ...base.highScores.beat, ...(raw.highScores?.beat ?? {}) },
     },
     equipped: { ...(raw.equipped ?? {}) },
   };
@@ -208,21 +290,54 @@ export function normalizeState(raw: Partial<GameState>, nowMs: number): GameStat
   return s;
 }
 
-/**
- * Pure deterministic tick:
- * - Floating-point stat decay (prevents rounding-wipeout during rapid polling)
- * - Exact sleep -> wake interval splitting at Energy 80
- * - Auto-sleep when awake Energy hits 0
- * - 72 game-hour weekend grace + offline decay floor of 25 (never inflates stats below 25)
- * - Roasted expiry
- * - Belly digestion with GDD power tiers, backflow, Hangry rule, and secret move modifiers
- * - Periodic 15 game-min viral backflow for previously digested memes
- */
+export function hatchStarter(
+  input: GameState,
+  species: SpeciesId,
+  rawName: string | undefined,
+  nowMs: number,
+): EngineResult {
+  const sp = SPECIES_BY_ID[species];
+  if (!sp) {
+    return { state: cloneState(input), ok: false, message: "Unknown starter species.", notes: [] };
+  }
+  const cleanName = (rawName ?? "").trim() || sp.defaultPetName;
+  if (cleanName.length > 24) {
+    return { state: cloneState(input), ok: false, message: "Name must be 1–24 characters.", notes: [] };
+  }
+  if (containsBlockedText(cleanName)) {
+    return { state: cloneState(input), ok: false, message: "Name blocked by the profanity/PII filter.", notes: [] };
+  }
+  const fresh = createFreshState(nowMs, input.clock, {
+    species,
+    name: cleanName,
+    hatched: true,
+  });
+  fresh.soundOn = input.soundOn;
+  return {
+    state: fresh,
+    ok: true,
+    message: `🥚 ${cleanName} the ${sp.name} hatched! Special [X]: ${sp.specialMove.name}`,
+    notes: [],
+  };
+}
+
 export function tickState(input: GameState, nowMs: number): { state: GameState; notes: string[] } {
   const s = cloneState(input);
   const notes: string[] = [];
+  if (!s.hatched) {
+    s.lastTickReal = nowMs;
+    return { state: s, notes };
+  }
+
   const timing = getTimingConfig(s.clock);
   const cap = statCapFor(s, nowMs);
+  const arch = speciesOf(s).archetype;
+
+  const fullRate = DECAY_RATES.fullnessPerHour * arch.fullnessDecayMul;
+  const happyRate = DECAY_RATES.happinessPerHour * arch.happinessDecayMul;
+  const hygRate = DECAY_RATES.hygienePerHour * arch.hygieneDecayMul;
+  const energyRate = DECAY_RATES.energyAwakePerHour * arch.energyDecayMul;
+  const sleepRate = DECAY_RATES.energySleepRestorePerHour * arch.sleepRestoreMul;
 
   const realElapsed = Math.max(0, nowMs - s.lastTickReal);
   const gameElapsed = realElapsed * s.clock;
@@ -240,16 +355,21 @@ export function tickState(input: GameState, nowMs: number): { state: GameState; 
 
     let remHours = effectiveGameElapsed / HOUR_MS;
 
-    // 1) If currently sleeping, restore energy until waking threshold (80) or time runs out.
+    // Passive heat cooling while awake/sleeping (Spicy Imp cools faster)
+    if (!s.isRoasted && s.heat > 0) {
+      const coolPerHour = s.species === "spicy-imp" ? 10 : 5;
+      s.heat = Math.max(0, s.heat - coolPerHour * remHours);
+    }
+
     if (s.isSleeping && remHours > 0) {
       const needed = Math.max(0, DECAY_RATES.sleepWakeThreshold - s.energy);
-      const hoursToWake = needed / DECAY_RATES.energySleepRestorePerHour;
+      const hoursToWake = needed / sleepRate;
       const sleepHours = Math.min(remHours, hoursToWake);
 
-      s.fullness -= DECAY_RATES.fullnessPerHour * DECAY_RATES.sleepOtherDecayFactor * sleepHours;
-      s.happiness -= DECAY_RATES.happinessPerHour * DECAY_RATES.sleepOtherDecayFactor * sleepHours;
-      s.hygiene -= DECAY_RATES.hygienePerHour * DECAY_RATES.sleepOtherDecayFactor * sleepHours;
-      s.energy += DECAY_RATES.energySleepRestorePerHour * sleepHours;
+      s.fullness -= fullRate * DECAY_RATES.sleepOtherDecayFactor * sleepHours;
+      s.happiness -= happyRate * DECAY_RATES.sleepOtherDecayFactor * sleepHours;
+      s.hygiene -= hygRate * DECAY_RATES.sleepOtherDecayFactor * sleepHours;
+      s.energy += sleepRate * sleepHours;
       remHours -= sleepHours;
 
       if (s.energy >= DECAY_RATES.sleepWakeThreshold - 1e-6) {
@@ -261,43 +381,37 @@ export function tickState(input: GameState, nowMs: number): { state: GameState; 
       }
     }
 
-    // 2) Apply awake decay for remaining hours; auto-sleep if energy hits 0.
     if (!s.isSleeping && remHours > 0) {
-      const hoursToZeroEnergy = Math.max(0, s.energy) / DECAY_RATES.energyAwakePerHour;
+      const hoursToZeroEnergy = Math.max(0, s.energy) / energyRate;
       if (remHours >= hoursToZeroEnergy && hoursToZeroEnergy > 0) {
-        s.fullness -= DECAY_RATES.fullnessPerHour * hoursToZeroEnergy;
-        s.happiness -= DECAY_RATES.happinessPerHour * hoursToZeroEnergy;
-        s.hygiene -= DECAY_RATES.hygienePerHour * hoursToZeroEnergy;
+        s.fullness -= fullRate * hoursToZeroEnergy;
+        s.happiness -= happyRate * hoursToZeroEnergy;
+        s.hygiene -= hygRate * hoursToZeroEnergy;
         s.energy = 0;
         s.isSleeping = true;
         pushEvent(s, `💤 ${s.name} fell asleep (Energy 0)`, nowMs);
         notes.push("💤 Energy hit 0 — your monster fell asleep automatically.");
         remHours -= hoursToZeroEnergy;
 
-        // If additional time elapsed after falling asleep, apply sleeping recovery
         if (remHours > 0) {
-          const sleepHours = Math.min(
-            remHours,
-            DECAY_RATES.sleepWakeThreshold / DECAY_RATES.energySleepRestorePerHour,
-          );
-          s.fullness -= DECAY_RATES.fullnessPerHour * DECAY_RATES.sleepOtherDecayFactor * sleepHours;
-          s.happiness -= DECAY_RATES.happinessPerHour * DECAY_RATES.sleepOtherDecayFactor * sleepHours;
-          s.hygiene -= DECAY_RATES.hygienePerHour * DECAY_RATES.sleepOtherDecayFactor * sleepHours;
-          s.energy += DECAY_RATES.energySleepRestorePerHour * sleepHours;
+          const sleepHours = Math.min(remHours, DECAY_RATES.sleepWakeThreshold / sleepRate);
+          s.fullness -= fullRate * DECAY_RATES.sleepOtherDecayFactor * sleepHours;
+          s.happiness -= happyRate * DECAY_RATES.sleepOtherDecayFactor * sleepHours;
+          s.hygiene -= hygRate * DECAY_RATES.sleepOtherDecayFactor * sleepHours;
+          s.energy += sleepRate * sleepHours;
           if (s.energy >= DECAY_RATES.sleepWakeThreshold - 1e-6) {
             s.energy = Math.max(s.energy, DECAY_RATES.sleepWakeThreshold);
             s.isSleeping = false;
           }
         }
       } else {
-        s.fullness -= DECAY_RATES.fullnessPerHour * remHours;
-        s.happiness -= DECAY_RATES.happinessPerHour * remHours;
-        s.hygiene -= DECAY_RATES.hygienePerHour * remHours;
-        s.energy -= DECAY_RATES.energyAwakePerHour * remHours;
+        s.fullness -= fullRate * remHours;
+        s.happiness -= happyRate * remHours;
+        s.hygiene -= hygRate * remHours;
+        s.energy -= energyRate * remHours;
       }
     }
 
-    // Clamp & apply offline decay floor (25, never artificially raising a stat above what it started at)
     for (const key of ["fullness", "happiness", "hygiene", "energy"] as const) {
       const clamped = clampFloat(s[key], cap);
       if (isLongOffline) {
@@ -314,10 +428,10 @@ export function tickState(input: GameState, nowMs: number): { state: GameState; 
   // Roasted expiry
   if (s.isRoasted && s.roastedUntilReal > 0 && nowMs >= s.roastedUntilReal) {
     s.isRoasted = false;
-    s.heat = 40;
+    s.heat = arch.roastedResetHeat;
     s.roastedUntilReal = 0;
     notes.push("🌡️ Your monster cooled down from being Roasted.");
-    pushEvent(s, "🌡️ Cooled down from Roasted (Heat 40)", nowMs);
+    pushEvent(s, `🌡️ Cooled down from Roasted (Heat ${arch.roastedResetHeat})`, nowMs);
     say(s, nowMs, "Cooled off. Careful with spicy.");
   }
 
@@ -331,7 +445,6 @@ export function tickState(input: GameState, nowMs: number): { state: GameState; 
     const meme = s.memes.find((m) => m.id === item.memeId || m.key === item.memeKey);
     if (!meme) continue;
 
-    // GDD §2: Hangry (fullness === 0) grants no power gain on digestion.
     if (Math.round(s.fullness) <= 0) {
       s.digestedCount += 1;
       const msg = `😤 Digested "${meme.title}" while Hangry — no power gained! Feed kibble first.`;
@@ -344,7 +457,6 @@ export function tickState(input: GameState, nowMs: number): { state: GameState; 
     const backflow = Math.min(5, Math.max(0, Math.floor((pNow - item.powerAtFed) / 10)));
     let tier = Math.min(10, Math.floor(pNow / 10)) + backflow;
 
-    // Secret move: Based Boost doubles next digestion power tier
     let basedUsed = false;
     if (s.buffs.basedBoostReady) {
       tier *= 2;
@@ -355,6 +467,8 @@ export function tickState(input: GameState, nowMs: number): { state: GameState; 
     let dom = dominantLabel(meme);
     let midUsed = false;
     let ratioUsed = false;
+    let speciesBonusTag = "";
+
     if (dom === "blech") {
       if (s.secrets["mid meme"]) {
         dom = "tasty";
@@ -362,14 +476,25 @@ export function tickState(input: GameState, nowMs: number): { state: GameState; 
       } else if (s.buffs.ratioShieldReady) {
         s.buffs.ratioShieldReady = false;
         ratioUsed = true;
+      } else if (arch.blechMul > 1) {
+        tier = Math.max(1, Math.round(tier * arch.blechMul));
+        speciesBonusTag = "Cursed Boost";
       } else {
-        // Blech weakens granted tier slightly unless shielded
         tier = Math.max(1, Math.floor(tier * 0.75));
       }
     }
 
-    const xpGain = awardXp(s, (tier * 15 + 10) * timing.xpMultiplier, nowMs, notes);
-    const dripGain = tier * 2;
+    let xpScale = 1;
+    if (dom === "tasty" && arch.tastyMul > 1) {
+      xpScale = arch.tastyMul;
+      speciesBonusTag = "Tasty Affinity";
+    } else if (dom === "spicy" && arch.spicyMul > 1) {
+      xpScale = arch.spicyMul;
+      speciesBonusTag = "Spicy Affinity";
+    }
+
+    const xpGain = awardXp(s, (tier * 15 + 10) * timing.xpMultiplier * xpScale, nowMs, notes);
+    const dripGain = Math.round(tier * 2 * arch.dripMul);
     s.drip += dripGain;
     s.digestedCount += 1;
 
@@ -399,6 +524,7 @@ export function tickState(input: GameState, nowMs: number): { state: GameState; 
     if (basedUsed) extras.push("Based Boost ×2");
     if (midUsed) extras.push("Mid Crisis");
     if (ratioUsed) extras.push("Ratio Shield");
+    if (speciesBonusTag) extras.push(speciesBonusTag);
 
     const digestMsg = `✨ Digested "${meme.title}" — +${xpGain} XP, +${dripGain} Drip (${dom}-dominant, power ${pNow}${extras.length ? `, ${extras.join(", ")}` : ""})`;
     notes.push(digestMsg);
@@ -406,14 +532,20 @@ export function tickState(input: GameState, nowMs: number): { state: GameState; 
     say(s, nowMs, "*happy burp*");
 
     if ((DIGESTION_MILESTONES as readonly number[]).includes(s.digestedCount)) {
-      const msMsg = `🔓 Power milestone! ${s.digestedCount} memes digested — a new power stirs!`;
+      const unlockLabel =
+        s.digestedCount === 5
+          ? "Turbo Charge (X Special recharges 35% faster!)"
+          : s.digestedCount === 15
+            ? "Second Wind (1 free shield every mini-game!)"
+            : "Meme Overdrive (×1.5 score multiplier in all games!)";
+      const msMsg = `🔓 Milestone ${s.digestedCount} digested! Unlocked ${unlockLabel}`;
       notes.push(msMsg);
       pushEvent(s, msMsg, nowMs);
     }
   }
   s.belly = remainingBelly;
 
-  // Periodic 15 game-min viral backflow for already-digested memes (GDD §5.2)
+  // Periodic 15 game-min viral backflow
   if (s.gameMs - s.lastBackflowGameMs >= BACKFLOW_INTERVAL_GAME_MS) {
     s.lastBackflowGameMs = s.gameMs;
     const today = utcDateKey(nowMs);
@@ -439,9 +571,9 @@ export function tickState(input: GameState, nowMs: number): { state: GameState; 
     }
     if (totalBackflowBonus > 0 && Math.round(s.fullness) > 0) {
       const bfXp = awardXp(s, totalBackflowBonus * 12 * timing.xpMultiplier, nowMs, notes);
-      const bfDrip = totalBackflowBonus * 2;
+      const bfDrip = Math.round(totalBackflowBonus * 2 * arch.dripMul);
       s.drip += bfDrip;
-      const bfMsg = `🌊 Viral backflow! Your earlier meme picks blew up: +${bfXp} XP, +${bfDrip} Drip`;
+      const bfMsg = `🌊 Viral backflow! Earlier meme picks blew up: +${bfXp} XP, +${bfDrip} Drip`;
       notes.push(bfMsg);
       pushEvent(s, bfMsg, nowMs);
     }
@@ -454,11 +586,10 @@ export function careAction(input: GameState, action: CareAction, nowMs: number):
   const { state: s, notes } = tickState(input, nowMs);
   const timing = getTimingConfig(s.clock);
   const cap = statCapFor(s, nowMs);
+  const sp = speciesOf(s);
 
   if (action === "wake") {
-    if (!s.isSleeping) {
-      return { state: s, ok: true, message: `${s.name} is already awake.`, notes };
-    }
+    if (!s.isSleeping) return { state: s, ok: true, message: `${s.name} is already awake.`, notes };
     s.isSleeping = false;
     pushEvent(s, `☀️ Woke ${s.name} up`, nowMs);
     say(s, nowMs, "I LIVE. Feed me.");
@@ -474,6 +605,7 @@ export function careAction(input: GameState, action: CareAction, nowMs: number):
     }
     s.isSleeping = true;
     s.lastSleepReal = nowMs;
+    updateCareStreak(s, nowMs, notes);
     pushEvent(s, `💤 Tucked ${s.name} in for a nap`, nowMs);
     say(s, nowMs, "Tucked in. Zzz…");
     return { state: s, ok: true, message: "💤 Tucked in. Energy recharges while sleeping.", notes };
@@ -490,12 +622,14 @@ export function careAction(input: GameState, action: CareAction, nowMs: number):
       say(s, nowMs, "Too full for kibble!");
       return { state: s, ok: false, message: `Kibble cooldown (${Math.ceil(waitMs / 1000)}s).`, notes };
     }
-    s.fullness = clampFloat(s.fullness + CARE_EFFECTS.feedFullness, cap);
+    const fullnessGain = Math.round(CARE_EFFECTS.feedFullness * sp.archetype.kibbleMul);
+    s.fullness = clampFloat(s.fullness + fullnessGain, cap);
     s.lastFeedReal = nowMs;
+    updateCareStreak(s, nowMs, notes);
     const xp = awardXp(s, CARE_EFFECTS.feedXp * timing.xpMultiplier, nowMs, notes);
-    pushEvent(s, `🍖 Fed kibble (+${CARE_EFFECTS.feedFullness} Fullness, +${xp} XP)`, nowMs);
-    say(s, nowMs, "Nom. Kibble era.");
-    return { state: s, ok: true, message: `🍖 Kibble served! +${CARE_EFFECTS.feedFullness} Fullness, +${xp} XP`, notes };
+    pushEvent(s, `🍖 Fed kibble (+${fullnessGain} Fullness, +${xp} XP)`, nowMs);
+    say(s, nowMs, sp.voiceLines.feed);
+    return { state: s, ok: true, message: `🍖 Kibble served! +${fullnessGain} Fullness, +${xp} XP`, notes };
   }
 
   if (action === "groom") {
@@ -506,13 +640,13 @@ export function careAction(input: GameState, action: CareAction, nowMs: number):
     }
     s.hygiene = clampFloat(s.hygiene + CARE_EFFECTS.groomHygiene, cap);
     s.lastGroomReal = nowMs;
+    updateCareStreak(s, nowMs, notes);
     const xp = awardXp(s, CARE_EFFECTS.groomXp * timing.xpMultiplier, nowMs, notes);
     pushEvent(s, `🛁 Groomed (+${CARE_EFFECTS.groomHygiene} Hygiene, +${xp} XP)`, nowMs);
     say(s, nowMs, "So fresh. So clean.");
     return { state: s, ok: true, message: `🛁 Scrubbed and sparkling! +${CARE_EFFECTS.groomHygiene} Hygiene, +${xp} XP`, notes };
   }
 
-  // play
   const waitMs = timing.playCdRealMs - (nowMs - s.lastPlayReal);
   if (s.lastPlayReal > 0 && waitMs > 0) {
     say(s, nowMs, "Need a breather.");
@@ -525,10 +659,11 @@ export function careAction(input: GameState, action: CareAction, nowMs: number):
   s.happiness = clampFloat(s.happiness + CARE_EFFECTS.playHappiness, cap);
   s.energy = clampFloat(s.energy - CARE_EFFECTS.playEnergyCost, cap);
   s.lastPlayReal = nowMs;
+  updateCareStreak(s, nowMs, notes);
   maybeUnfreezeEvolution(s, nowMs, notes);
   const xp = awardXp(s, CARE_EFFECTS.playXp * timing.xpMultiplier, nowMs, notes);
   pushEvent(s, `🎾 Play session (+${CARE_EFFECTS.playHappiness} Happiness, −${CARE_EFFECTS.playEnergyCost} Energy, +${xp} XP)`, nowMs);
-  say(s, nowMs, "BEST. DAY. EVER.");
+  say(s, nowMs, sp.voiceLines.play);
   return {
     state: s,
     ok: true,
@@ -579,11 +714,8 @@ export function voteMeme(input: GameState, memeId: number, label: Label, nowMs: 
     return { state: s, ok: false, message: "You already voted on this meme today.", notes };
   }
   const meme = s.memes.find((m) => m.id === memeId && !m.hidden);
-  if (!meme) {
-    return { state: s, ok: false, message: "Meme not found.", notes };
-  }
+  if (!meme) return { state: s, ok: false, message: "Meme not found.", notes };
 
-  // Secret move `rizz` (Charisma): your votes carry +1 extra weight!
   const weight = s.secrets["rizz"] ? 2 : 1;
   meme[label] += weight;
   meme.lastActivityGameMs = s.gameMs;
@@ -596,7 +728,12 @@ export function voteMeme(input: GameState, memeId: number, label: Label, nowMs: 
   };
 }
 
-function tryUnlockSecret(s: GameState, normalizedPhrase: string, nowMs: number, notes: string[]): { unlocked: string | null; alreadyHad: boolean; line?: string; effect?: string } {
+function tryUnlockSecret(
+  s: GameState,
+  normalizedPhrase: string,
+  nowMs: number,
+  notes: string[],
+): { unlocked: string | null; alreadyHad: boolean; line?: string; effect?: string } {
   const def = LAUNCH_SECRET_WORDS[normalizedPhrase];
   if (!def) return { unlocked: null, alreadyHad: false };
   if (s.secrets[normalizedPhrase]) {
@@ -613,7 +750,6 @@ function tryUnlockSecret(s: GameState, normalizedPhrase: string, nowMs: number, 
   s.happiness = clampFloat(s.happiness + 10, cap);
   maybeUnfreezeEvolution(s, nowMs, notes);
 
-  // Activate immediate secret move buffs
   if (normalizedPhrase === "stonks") s.buffs.stonksUntilReal = nowMs + HOUR_MS;
   if (normalizedPhrase === "no cap") s.buffs.noCapUntilReal = nowMs + DAY_MS;
   if (normalizedPhrase === "based and correct") s.buffs.basedBoostReady = true;
@@ -643,9 +779,7 @@ export function addCustomLabel(
     return { state: s, ok: false, message: "Label blocked by the profanity/PII filter.", notes, extra: { unlocked: null } };
   }
   const meme = s.memes.find((m) => m.id === memeId && !m.hidden);
-  if (!meme) {
-    return { state: s, ok: false, message: "Meme not found.", notes, extra: { unlocked: null } };
-  }
+  if (!meme) return { state: s, ok: false, message: "Meme not found.", notes, extra: { unlocked: null } };
 
   const key = normalizePhrase(clean);
   const secretRes = tryUnlockSecret(s, key, nowMs, notes);
@@ -703,11 +837,12 @@ export function shareMeme(input: GameState, memeId: number, nowMs: number): Engi
   meme.shares += 1;
   meme.lastActivityGameMs = s.gameMs;
   const xp = awardXp(s, CARE_EFFECTS.shareXp * timing.xpMultiplier, nowMs, notes);
-  s.drip += CARE_EFFECTS.shareDrip;
+  const drip = Math.round(CARE_EFFECTS.shareDrip * speciesOf(s).archetype.dripMul);
+  s.drip += drip;
   return {
     state: s,
     ok: true,
-    message: `Shared "${meme.title}" — +1 power, +${xp} XP, +${CARE_EFFECTS.shareDrip} Drip commission.`,
+    message: `Shared "${meme.title}" — +1 power, +${xp} XP, +${drip} Drip commission.`,
     notes,
   };
 }
@@ -809,6 +944,7 @@ export function feedMeme(
   const { state: s, notes } = tickState(input, nowMs);
   const timing = getTimingConfig(s.clock);
   const cap = statCapFor(s, nowMs);
+  const arch = speciesOf(s).archetype;
 
   if (s.isSleeping) {
     say(s, nowMs, "Zzz… no eating in my sleep.");
@@ -826,15 +962,12 @@ export function feedMeme(
   const meme = s.memes.find(
     (m) => !m.hidden && ((target.memeId != null && m.id === target.memeId) || (target.memeKey != null && m.key === target.memeKey)),
   );
-  if (!meme) {
-    return { state: s, ok: false, message: "Meme not found.", notes };
-  }
+  if (!meme) return { state: s, ok: false, message: "Meme not found.", notes };
   if (s.belly.some((b) => b.memeId === meme.id)) {
     say(s, nowMs, "Already digesting that one!");
     return { state: s, ok: false, message: `"${meme.title}" is already in the belly.`, notes };
   }
 
-  // Handheld "label IS feeding" flow optionally applies a vote at feed time
   if (target.label) {
     const weight = s.secrets["rizz"] ? 2 : 1;
     meme[target.label] += weight;
@@ -851,22 +984,22 @@ export function feedMeme(
     powerAtFed: power,
   });
   s.fullness = clampFloat(s.fullness + 6, cap);
+  updateCareStreak(s, nowMs, notes);
 
   const dom = dominantLabel(meme);
   let heatMsg = "";
   if (dom === "spicy" || meme.spicy > 0) {
     const heatDelta = dom === "spicy" ? 25 : 10;
     const newHeat = s.heat + heatDelta;
-    if (newHeat >= 100) {
-      // Secret move `rickroll` auto-recovers from Roasted once!
+    if (newHeat >= arch.heatCap) {
       if (s.buffs.rickrollSaveReady) {
         s.buffs.rickrollSaveReady = false;
-        s.heat = 40;
-        heatMsg = " 🎵 Rickroll saved you from getting Roasted! Heat reset to 40.";
-        pushEvent(s, "🎵 Never Gonna Give You Up saved Mochi from Roasted!", nowMs);
+        s.heat = arch.roastedResetHeat;
+        heatMsg = ` 🎵 Rickroll saved you from Roasted! Heat reset to ${arch.roastedResetHeat}.`;
+        pushEvent(s, `🎵 Never Gonna Give You Up saved ${s.name} from Roasted!`, nowMs);
         say(s, nowMs, "Never gonna give you up~");
       } else {
-        s.heat = 100;
+        s.heat = arch.heatCap;
         s.isRoasted = true;
         s.roastedUntilReal = nowMs + timing.roastedRealMs;
         heatMsg = ` 🌡️ Too spicy! ROASTED for ${Math.round(timing.roastedRealMs / 60_000) || 1}m.`;
@@ -875,7 +1008,7 @@ export function feedMeme(
       }
     } else {
       s.heat = newHeat;
-      heatMsg = ` 🌶️ Heat rose to ${Math.round(newHeat)}/100.`;
+      heatMsg = ` 🌶️ Heat rose to ${Math.round(newHeat)}/${arch.heatCap}.`;
     }
   }
 
@@ -906,7 +1039,6 @@ export function talkAction(input: GameState, rawText: string, nowMs: number): En
   }
   const low = normalizePhrase(clean);
 
-  // 1) Secret word check
   const secretRes = tryUnlockSecret(s, low, nowMs, notes);
   if (secretRes.unlocked) {
     return {
@@ -921,7 +1053,6 @@ export function talkAction(input: GameState, rawText: string, nowMs: number): En
     return { state: s, ok: true, message: `Already unlocked: ${LAUNCH_SECRET_WORDS[low]?.move}.`, notes };
   }
 
-  // 2) Voice care commands
   if (low === "feed" || low === "kibble") return careAction(s, "feed", nowMs);
   if (low === "groom" || low === "bath") return careAction(s, "groom", nowMs);
   if (low === "play") return careAction(s, "play", nowMs);
@@ -931,7 +1062,6 @@ export function talkAction(input: GameState, rawText: string, nowMs: number): En
   }
   if (low === "wake" || low === "wake up") return careAction(s, "wake", nowMs);
 
-  // 3) Label voice reaction
   const cap = statCapFor(s, nowMs);
   if (low === "tasty" || low === "spicy" || low === "blech") {
     say(s, nowMs, `${low.toUpperCase()}! Noted.`);
@@ -940,18 +1070,13 @@ export function talkAction(input: GameState, rawText: string, nowMs: number): En
     return {
       state: s,
       ok: true,
-      message: `Heard "${low}" — open FEED and hold to feed a meme with that label.`,
+      message: `Heard "${low}" — open FEED to feed a meme with that label.`,
       notes,
     };
   }
 
-  // 4) Ambient pet banter
-  const replies = [
-    "Interesting. Feed it to me as a meme.",
-    "Noted. Anyway — memes?",
-    "Bold take. I respect it.",
-    "I heard you. I choose memes.",
-  ];
+  const sp = speciesOf(s);
+  const replies = sp.voiceLines.banter;
   const hash = [...low].reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
   const reply = replies[Math.abs(hash) % replies.length] ?? replies[0]!;
   say(s, nowMs, reply, 5000);
@@ -965,13 +1090,15 @@ export function completeMiniGame(
   game: MiniGameId,
   rawScore: number,
   nowMs: number,
-): EngineResult<{ xpGained: number; dripGained: number }> {
+  rawMaxCombo = 0,
+): EngineResult<{ xpGained: number; dripGained: number; isNewBest: boolean }> {
   const { state: s, notes } = tickState(input, nowMs);
   const timing = getTimingConfig(s.clock);
   const cap = statCapFor(s, nowMs);
-  const score = Math.max(0, Math.min(500, Math.floor(rawScore)));
+  const sp = speciesOf(s);
+  const score = Math.max(0, Math.min(9999, Math.floor(rawScore)));
+  const maxCombo = Math.max(0, Math.min(999, Math.floor(rawMaxCombo)));
 
-  // GDD §2: Hangry (fullness === 0) won't train.
   if (Math.round(s.fullness) <= 0) {
     say(s, nowMs, "Too hangry to train!");
     return {
@@ -979,33 +1106,52 @@ export function completeMiniGame(
       ok: false,
       message: "Your monster is Hangry (0 Fullness) and refuses to train. Feed it first!",
       notes,
-      extra: { xpGained: 0, dripGained: 0 },
+      extra: { xpGained: 0, dripGained: 0, isNewBest: false },
     };
   }
 
-  // Secret moves: Chad (+30% power/score), Stonks (+25% training XP)
-  const effectiveScore = s.secrets["chad"] ? Math.round(score * 1.3) : score;
-  let baseXp = (20 + effectiveScore * 2) * timing.xpMultiplier;
-  if (s.fullness < 30) baseXp *= 0.5; // GDD §2: Fullness < 30 -> training rewards -50%
+  // Personal Best tracking
+  const prevBest = s.highScores[game];
+  const isNewBest = score > prevBest.bestScore;
+  s.highScores[game] = {
+    bestScore: Math.max(prevBest.bestScore, score),
+    bestCombo: Math.max(prevBest.bestCombo, maxCombo),
+    plays: prevBest.plays + 1,
+  };
+
+  // Scale big arcade scores cleanly into balanced XP & Drip rewards
+  const normalizedPoints = Math.min(180, Math.round(score / 5) + Math.min(30, maxCombo));
+  let effectivePoints = Math.round(normalizedPoints * sp.archetype.miniGameScoreMul);
+  if (s.secrets["chad"]) effectivePoints = Math.round(effectivePoints * 1.3);
+
+  const milestones = milestonePowersFor(s.digestedCount);
+  let baseXp = (22 + effectivePoints * 1.8) * timing.xpMultiplier;
+  if (milestones.memeOverdrive) baseXp *= 1.5;
+  if (s.fullness < 30) baseXp *= 0.5;
   if (s.buffs.stonksUntilReal > nowMs) baseXp *= 1.25;
 
-  const dripGained = Math.floor(effectiveScore / 3);
+  const dripGained = Math.max(2, Math.round((Math.floor(effectivePoints / 2.8) + (isNewBest ? 8 : 0)) * sp.archetype.dripMul));
   s.happiness = clampFloat(s.happiness + CARE_EFFECTS.miniGameHappiness, cap);
   s.energy = clampFloat(s.energy - CARE_EFFECTS.miniGameEnergyCost, cap);
   s.drip += dripGained;
+  updateCareStreak(s, nowMs, notes);
 
   maybeUnfreezeEvolution(s, nowMs, notes);
   const xpGained = awardXp(s, baseXp, nowMs, notes);
 
-  const label = game === "dodge" ? "🏃 Meme Dodge" : "🧩 Label Match";
+  const gameMeta = MINI_GAMES_CATALOG.find((g) => g.id === game);
+  const label = gameMeta ? `${gameMeta.glyph} ${gameMeta.name}` : game;
   const bonuses: string[] = [];
+  if (isNewBest) bonuses.push("🏆 NEW BEST!");
+  if (sp.archetype.miniGameScoreMul > 1) bonuses.push(`${sp.name} +15%`);
   if (s.secrets["chad"]) bonuses.push("Chad +30%");
+  if (milestones.memeOverdrive) bonuses.push("Overdrive ×1.5");
   if (s.buffs.stonksUntilReal > nowMs) bonuses.push("Stonks +25%");
   if (s.fullness < 30) bonuses.push("Hungry −50%");
 
-  pushEvent(s, `${label} score ${score} (+${xpGained} XP, +${dripGained} Drip)`, nowMs);
+  pushEvent(s, `${label} score ${score}${isNewBest ? " 🏆" : ""} (+${xpGained} XP, +${dripGained} Drip)`, nowMs);
   if (!notes.some((n) => n.includes("EVOLVED"))) {
-    say(s, nowMs, game === "dodge" ? "Untouchable. Basically Neo." : "Big brain. Huge.");
+    say(s, nowMs, isNewBest ? "NEW HIGH SCORE!! Legendary!" : sp.voiceLines.play);
   }
 
   return {
@@ -1013,7 +1159,7 @@ export function completeMiniGame(
     ok: true,
     message: `${label} complete! Score ${score}: +${xpGained} XP, +${CARE_EFFECTS.miniGameHappiness} Happiness, −${CARE_EFFECTS.miniGameEnergyCost} Energy, +${dripGained} Drip${bonuses.length ? ` (${bonuses.join(", ")})` : ""}`,
     notes,
-    extra: { xpGained, dripGained },
+    extra: { xpGained, dripGained, isNewBest },
   };
 }
 
@@ -1052,7 +1198,6 @@ export function equipCosmetic(input: GameState, assetId: string, nowMs: number):
 
   s.equipped[item.slot] = item.id;
   let bonusMsg = "";
-  // GDD §2: +5 Happiness strictly on FIRST wear of a new outfit (prevents infinite farm exploit)
   if (!s.firstWornCosmetics.includes(item.id)) {
     s.firstWornCosmetics.push(item.id);
     s.happiness = clampFloat(s.happiness + CARE_EFFECTS.firstWearHappiness, cap);
@@ -1089,6 +1234,7 @@ export function toGameView(s: GameState, nowMs: number, notes: string[] = []): G
   const displayDef = stageDefByNumber(s.displayStage);
   const nextStage = nextStageForStage(s.stage);
   const mood = computeMood(s);
+  const sp = speciesOf(s);
   const todaysVotes = s.votes.filter((v) => v.voteDate === today);
   const votedIds = new Set(todaysVotes.map((v) => v.memeId));
   const voteBudget = voteBudgetForStage(s.stage);
@@ -1129,8 +1275,13 @@ export function toGameView(s: GameState, nowMs: number, notes: string[] = []): G
     .filter((x): x is NonNullable<typeof x> => x !== null);
 
   return {
+    hatched: s.hatched,
+    speciesCatalog: SPECIES_CATALOG,
+    miniGames: MINI_GAMES_CATALOG,
     monster: {
       name: s.name,
+      species: s.species,
+      speciesDef: sp,
       xp: s.xp,
       stage: s.stage,
       stageName: stageDef.name,
@@ -1143,12 +1294,16 @@ export function toGameView(s: GameState, nowMs: number, notes: string[] = []): G
       hygiene: Math.round(s.hygiene),
       energy: Math.round(s.energy),
       heat: Math.round(s.heat),
+      heatCap: sp.archetype.heatCap,
       statCap: statCapFor(s, nowMs),
       drip: s.drip,
       isSleeping: s.isSleeping,
       isRoasted: s.isRoasted,
       roastedLeftSec: s.isRoasted ? Math.max(0, Math.ceil((s.roastedUntilReal - nowMs) / 1000)) : 0,
       digestedCount: s.digestedCount,
+      careStreak: s.careStreak,
+      highScores: s.highScores,
+      milestonePowers: milestonePowersFor(s.digestedCount),
       memeSlots: bellyCapacity(s.stage),
       voteBudget,
       mood,

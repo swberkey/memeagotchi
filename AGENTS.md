@@ -4,7 +4,7 @@ This file is the **shared operating contract** for every AI harness working on t
 
 ## 1. Source of Truth Hierarchy
 1. **`docs/GDD-v1.0.md`** — Owner-approved Game Design Document v1.0 (all 7 decisions locked). Do **not** alter a locked GDD rule without flagging it and recording an ADR in `docs/decisions/`.
-2. **`docs/handheld-architecture.md`** — Three-layer hardware split (ESP32-S3 192×192 device ↔ Muse voice brain ↔ Web/Phone companion).
+2. **`docs/handheld-architecture.md`** — Three-layer hardware split (ESP32-S3 + 1.69" ST7789V2 `280×240` landscape IPS + D-Pad/`O`/`X`/`--` device ↔ Muse voice brain ↔ Web/Phone companion).
 3. **`docs/contracts/`** — Interface contracts shared between `packages/game-core`, `apps/server`, `apps/web-companion`, `apps/handheld-sim`, and future ESP32-S3 C/C++ firmware.
 4. **`docs/decisions/`** — Architecture Decision Records (ADRs) documenting intentional retuning (e.g., Nov 17 Energy/Sleep retuning) and tech choices.
 5. **`tasks/BOARD.md`** — Live sprint progress, bug register, and handoffs.
@@ -20,7 +20,7 @@ This file is the **shared operating contract** for every AI harness working on t
 ## 3. Standard Verification Commands
 Always run before marking a task done:
 ```bash
-npm run typecheck   # Strict TypeScript across all 5 workspaces
+npm run typecheck   # Strict TypeScript across all 7 workspaces
 npm test            # Pure game-core + HTTP/SQLite integration tests
 npm run build       # Production builds for packages, server, web-companion, handheld-sim
 ```

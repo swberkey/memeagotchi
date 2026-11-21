@@ -8,6 +8,8 @@ import {
   createFreshState,
   equipCosmetic,
   feedMeme,
+  hatchStarter,
+  milestonePowersFor,
   postBonusMeme,
   postMeme,
   renameMonster,
@@ -196,7 +198,7 @@ describe("@memeagotchi/game-core", () => {
     // Hangry (Fullness 0) refuses training
     const hangry = createFreshState(T0, 60);
     hangry.fullness = 0;
-    const trainAttempt = completeMiniGame(hangry, "dodge", 20, T0 + 1000);
+    const trainAttempt = completeMiniGame(hangry, "runner", 120, T0 + 1000, 5);
     assert.equal(trainAttempt.ok, false);
   });
 
@@ -275,8 +277,8 @@ describe("@memeagotchi/game-core", () => {
     const healthy = createFreshState(T0, 1);
     const hungry = createFreshState(T0, 1);
     hungry.fullness = 20;
-    const healthyGame = completeMiniGame(healthy, "dodge", 20, T0 + 1000);
-    const hungryGame = completeMiniGame(hungry, "dodge", 20, T0 + 1000);
+    const healthyGame = completeMiniGame(healthy, "blaster", 200, T0 + 1000, 10);
+    const hungryGame = completeMiniGame(hungry, "blaster", 200, T0 + 1000, 10);
     assert.equal(hungryGame.extra!.xpGained, Math.round(healthyGame.extra!.xpGained * 0.5));
 
     // 3) Mid Crisis converts blech-dominant digestion into tasty Fullness/Happiness boost
@@ -332,11 +334,60 @@ describe("@memeagotchi/game-core", () => {
     assert.equal(realClock.state.clock, 1);
     assert.equal(realClock.state.soundOn, false);
 
-    // Mini-game with Stonks + Chad buffs
+    // Mini-game with Stonks + Chad buffs + Personal Best tracking
     let buffed = talkAction(realClock.state, "stonks", T0 + 5000).state;
     buffed = talkAction(buffed, "chad", T0 + 6000).state;
-    const gameRes = completeMiniGame(buffed, "dodge", 20, T0 + 7000);
+    const gameRes = completeMiniGame(buffed, "beat", 240, T0 + 7000, 18);
     assert.equal(gameRes.ok, true);
-    assert.ok(gameRes.extra!.xpGained > 20 + 20 * 2);
+    assert.equal(gameRes.extra!.isNewBest, true);
+    assert.equal(gameRes.state.highScores.beat.bestScore, 240);
+    assert.equal(gameRes.state.highScores.beat.bestCombo, 18);
+    assert.equal(gameRes.state.highScores.beat.plays, 1);
+  });
+
+  it("supports hatching all 5 starter species with distinct archetypes, daily care streaks, and 5/15/30 milestone powers", () => {
+    const unhatched = createFreshState(T0, 1, { hatched: false });
+    assert.equal(unhatched.hatched, false);
+
+    // 1) Spicy Imp: Heat cap 120 (doesn't roast at 100!)
+    const impRes = hatchStarter(unhatched, "spicy-imp", "Ignis", T0 + 1000);
+    assert.equal(impRes.ok, true);
+    assert.equal(impRes.state.hatched, true);
+    assert.equal(impRes.state.species, "spicy-imp");
+    assert.equal(impRes.state.name, "Ignis");
+    impRes.state.heat = 85;
+    const stonks = impRes.state.memes.find((m) => m.key === "stonks")!;
+    const hotFed = feedMeme(impRes.state, { memeId: stonks.id }, T0 + 2000);
+    assert.equal(Math.round(hotFed.state.heat), 110);
+    assert.equal(hotFed.state.isRoasted, false); // heatCap is 120 for Spicy Imp!
+
+    // 2) Cozy Frog: slower energy decay (0.75x) & +20% kibble (+36 Fullness)
+    const frog = hatchStarter(unhatched, "cozy-frog", "Pebbles", T0 + 1000).state;
+    frog.fullness = 40;
+    const fedFrog = careAction(frog, "feed", T0 + 2000);
+    assert.equal(Math.round(fedFrog.state.fullness), 76); // 40 + 36
+    const after4HrFrog = tickState(frog, T0 + 1000 + 4 * HR).state;
+    assertClose(after4HrFrog.energy, 84 - 3); // 0.75 * 4 = 3 energy instead of 4!
+
+    // 3) Cyber Cat: +15% mini-game XP payout vs Mint Dragon
+    const cat = hatchStarter(unhatched, "cyber-cat", "Pixel", T0 + 1000).state;
+    const dragon = hatchStarter(unhatched, "mint-dragon", "Mochi", T0 + 1000).state;
+    const catRun = completeMiniGame(cat, "runner", 300, T0 + 2000, 12);
+    const dragRun = completeMiniGame(dragon, "runner", 300, T0 + 2000, 12);
+    assert.ok(catRun.extra!.xpGained > dragRun.extra!.xpGained);
+
+    // 4) Daily Care Streak increments on consecutive UTC days & grants Drip bonus
+    let streakPet = careAction(dragon, "feed", T0 + 1000).state;
+    assert.equal(streakPet.careStreak.count, 1);
+    const dripDay1 = streakPet.drip;
+    streakPet = careAction(streakPet, "feed", T0 + DAY + 1000).state;
+    assert.equal(streakPet.careStreak.count, 2);
+    assert.ok(streakPet.drip > dripDay1);
+
+    // 5) Active Digestion Milestone Powers at 5 / 15 / 30
+    assert.deepEqual(milestonePowersFor(4), { turboCharge: false, secondWind: false, memeOverdrive: false });
+    assert.deepEqual(milestonePowersFor(5), { turboCharge: true, secondWind: false, memeOverdrive: false });
+    assert.deepEqual(milestonePowersFor(15), { turboCharge: true, secondWind: true, memeOverdrive: false });
+    assert.deepEqual(milestonePowersFor(30), { turboCharge: true, secondWind: true, memeOverdrive: true });
   });
 });

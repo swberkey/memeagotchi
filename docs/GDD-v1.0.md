@@ -191,3 +191,26 @@ All seven open decisions were reviewed and approved by Scott Berkey on Nov 6, 20
 | 5 | Meme upload policy | **File upload only (≤ 5 MB) at launch**; URL import deferred to post-beta; report button on every meme |
 | 6 | Custom label moderation | **Filter + post-moderation** (profanity/PII filter, 3 reports auto-hide) — no pre-moderation queue |
 | 7 | Secret word list | "mid" → **"mid meme"**, "based" → **"based and correct"**; launch 10, hold 5 in reserve for events |
+
+---
+
+## 11. v1.1 Addendum — Roster, 280×240 Handheld & SNES Arcade Overhaul (Approved Nov 20, 2026)
+
+See [ADR-002](./decisions/ADR-002-handheld-280x240-roster-games.md) for full rationale. All v1.0 systems above remain in effect with the following approved expansions:
+
+- **Title Screen & 5 Starter Species (Single Active Pet Slot):** Players begin on a Title Screen and choose one of 5 starter species with distinct stat-curve archetypes and signature `X` Special Moves:
+  1. **Mochi (`mint-dragon`)** — Balanced, +10% tasty digestion · `X`: *Bubble Shield*
+  2. **Scoville (`spicy-imp`)** — Heat cap 120, faster cooling, +20% spicy XP, 1.15× fullness decay · `X`: *Fire Dash*
+  3. **Pixel (`cyber-cat`)** — +15% mini-game combo & XP, 1.15× energy decay · `X`: *Glitch Blink*
+  4. **Pebbles (`cozy-frog`)** — 0.75× energy decay, +20% kibble/sleep bonus · `X`: *Zen Slow*
+  5. **Wisp (`cursed-ghost`)** — +50% blech power, +25% Drip gain, 1.15× happiness decay · `X`: *Phantom Phase*
+- **Expanded Arcade Trio (replaces v1.0 two-game placeholder):** Three 60fps `280×240` SNES-style games built for D-Pad + `O` / `X` / `--` controls (physical on handheld, on-screen gamepad + keyboard on Companion):
+  1. **Meme Runner DX** (side-scrolling platformer)
+  2. **Troll Blaster** (4-way top-down arena shooter)
+  3. **Vibe Beat** (chiptune rhythm-reflex stage)
+- **Active 5 / 15 / 30 Digestion Milestone Powers:**
+  - **5 digested — Turbo Charge:** Species `X` Special recharges 35% faster in mini-games.
+  - **15 digested — Second Wind:** One automatic free hit-shield/revive per mini-game run.
+  - **30 digested — Meme Overdrive:** Start every mini-game with a `×1.5` Overdrive multiplier.
+- **Daily Care Streaks & High Scores:** Consecutive UTC care days award escalating Drip & XP bonuses; each of the 3 SNES games tracks personal best score, max combo, and play count.
+- **Nov 17 Sleep/Energy Tuning Preserved:** Base awake Energy decay `−1/hr`, Play/Mini-game cost `−5 Energy`, Sleep restore `+20/hr` (modified by species archetype multipliers).

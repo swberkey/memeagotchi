@@ -56,7 +56,10 @@ describe("@memeagotchi/server HTTP + SQLite integration", () => {
     const health = (await fetch(`${base}/api/health`).then((r) => r.json())) as { ok: boolean };
     assert.equal(health.ok, true);
 
-    // 1) Companion renames Mochi & buys Chef Hat
+    // 1) Companion hatches Mint Dragon, renames it & buys Chef Hat
+    const hatched = await rpc("hatchStarter", { species: "mint-dragon", name: "Mochi" });
+    assert.equal(hatched.body.result.ok, true);
+
     const renamed = await rpc("renameMonster", { name: "Nugget" });
     assert.equal(renamed.status, 200);
     assert.equal(renamed.body.result.view.monster.name, "Nugget");
@@ -169,7 +172,15 @@ describe("@memeagotchi/server HTTP + SQLite integration", () => {
     const inst1 = await startInstance();
     const s0 = await inst1.rpc("getState", {});
     assert.equal(s0.status, 200);
-    const firstMemeId = s0.body.result.view.memes[0].id;
+    assert.equal(s0.body.result.view.hatched, false);
+
+    // Hatch starter species via Title Screen flow
+    const hatched = await inst1.rpc("hatchStarter", { species: "cyber-cat", name: "Pixel" });
+    assert.equal(hatched.body.result.ok, true);
+    assert.equal(hatched.body.result.view.hatched, true);
+    assert.equal(hatched.body.result.view.monster.species, "cyber-cat");
+
+    const firstMemeId = hatched.body.result.view.memes[0].id;
 
     assert.equal((await inst1.rpc("care", { action: "feed" })).body.result.ok, true);
     assert.equal((await inst1.rpc("care", { action: "groom" })).body.result.ok, true);
@@ -188,7 +199,9 @@ describe("@memeagotchi/server HTTP + SQLite integration", () => {
     assert.equal((await inst1.rpc("reportMeme", { memeId: posted.body.result.id })).body.result.ok, true);
     assert.equal((await inst1.rpc("postBonusMeme", { bonusKey: "bonus-wow" })).body.result.ok, true);
     assert.equal((await inst1.rpc("feedMeme", { memeId: firstMemeId, label: "tasty" })).body.result.ok, true);
-    assert.equal((await inst1.rpc("completeMiniGame", { game: "match", score: 25 })).body.result.ok, true);
+    const mini = await inst1.rpc("completeMiniGame", { game: "runner", score: 280, maxCombo: 14 });
+    assert.equal(mini.body.result.ok, true);
+    assert.equal(mini.body.result.isNewBest, true);
     assert.equal((await inst1.rpc("updateSettings", { clock: 1, soundOn: false })).body.result.ok, true);
     assert.equal((await inst1.rpc("setDisplayStage", { stage: 1 })).body.result.ok, false); // locked at Stage 1
 
@@ -204,9 +217,10 @@ describe("@memeagotchi/server HTTP + SQLite integration", () => {
     assert.ok(afterReboot.body.result.view.secrets.some((x: any) => x.word === "stonks"));
     assert.equal(afterReboot.body.result.view.belly.length, 1);
 
-    // Reset pet clears everything while preserving settings
+    // Reset pet returns to unhatched Title Screen while preserving settings
     const reset = await inst2.rpc("resetPet", {});
     assert.equal(reset.body.result.ok, true);
+    assert.equal(reset.body.result.view.hatched, false);
     assert.equal(reset.body.result.view.monster.xp, 0);
     assert.equal(reset.body.result.view.belly.length, 0);
     assert.equal(reset.body.result.view.settings.clock, 1);
