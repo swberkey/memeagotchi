@@ -4,10 +4,11 @@ A Tamagotchi-style virtual pet whose food, power source, and social currency are
 
 ## What's Inside (v1.3 · 320×240 Online Edition)
 - **Title Screen & 5 Playable Starter Species:** Choose from **Mint Dragon (Mochi)**, **Spicy Imp (Scoville)**, **Cyber Cat (Pixel)**, **Cozy Frog (Pebbles)**, or **Cursed Ghost (Wisp)** — each with custom concept sheets in `docs/art/`, distinct stat-curve archetypes, voice banter, and an exclusive **`X` Signature Special Move**.
-- **3 60fps `320×240` (4:3) SNES Mini-Games (`@memeagotchi/snes-games`):**
+- **4 60fps `320×240` (4:3) SNES Arcade Games (`@memeagotchi/snes-games`):**
   1. **Meme Runner DX** — SNES side-scrolling platformer with floating platforms, stompable enemies, double-jump, and species specials.
   2. **Troll Blaster** — 8-way top-down arena shooter with enemy waves and mini-bosses.
   3. **Vibe Beat** — Live WebAudio chiptune rhythm stage with dancing dressed-up monster and 5-lane beat highway (`◄ ▼ ▲ ► O` + `X` Special).
+  4. **Ember Vale** — Full 16-bit top-down action-adventure RPG compiled from the real ESP32-S3 C99 core to WebAssembly (`hardware/ember-vale/`): 24 overworld screens, 2 castles (Bramblekeep & Cinderspire), 9 heart containers, the Silly Meme Vault, persistent flash saves, and host coin cash-out into MemeAgotchi Drip & XP!
 - **Full-Screen Meme Feed (`▲`) & Always-On Meme Dream Screensaver:** Press `▲` Up Arrow while feeding for edge-to-edge full-screen memes. While sleeping, Light / Sound / Motion wake the handheld into a full-screen 4:3 slideshow of the memes your monster has fed on, with a **1/8-size gliding pixel sleeping monster**.
 - **Multi-User Online Hub, 6-Char Handheld Pairing & Real-Time SSE Sync:**
   - Create a cloud account (`@handle` + password, `scrypt` hashed, signed `HttpOnly` cookie session) for an isolated SQLite pet save — or play immediately as a zero-friction Local Guest.

@@ -4,11 +4,15 @@ import type { GamepadButton, GamepadController } from "./types.ts";
 export function ArcadeGamepad({
   controller,
   specialLabel = "Special",
+  actionLabel = "Action",
+  menuLabel = "Pause / Menu",
   onMenuHold,
   compact = false,
 }: {
   controller: GamepadController;
   specialLabel?: string;
+  actionLabel?: string;
+  menuLabel?: string;
   onMenuHold?: () => void;
   compact?: boolean;
 }) {
@@ -141,7 +145,7 @@ export function ArcadeGamepad({
           --
         </button>
         <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "#bcb2dc" }}>
-          Pause / Menu
+          {menuLabel}
         </span>
       </div>
 
@@ -196,7 +200,7 @@ export function ArcadeGamepad({
             O
           </button>
           <span className="text-[10px] font-bold" style={{ color: "#7be6d8" }}>
-            Action
+            {actionLabel}
           </span>
         </div>
       </div>

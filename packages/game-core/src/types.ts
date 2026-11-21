@@ -1,6 +1,6 @@
 export type Label = "tasty" | "spicy" | "blech";
 export type CareAction = "feed" | "groom" | "play" | "sleep" | "wake";
-export type MiniGameId = "runner" | "blaster" | "beat";
+export type MiniGameId = "runner" | "blaster" | "beat" | "ember";
 export type CosmeticSlot = "head" | "face" | "body" | "back" | "sticker";
 export type ClockRate = 1 | 60;
 

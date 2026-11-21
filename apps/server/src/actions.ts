@@ -290,9 +290,9 @@ export const Actions = {
   }),
 
   completeMiniGame: defineAction({
-    description: "Awards server-side XP, Drip, Happiness, Energy, and high scores for Meme Runner DX, Troll Blaster, or Vibe Beat.",
+    description: "Awards server-side XP, Drip, Happiness, Energy, and high scores for Meme Runner DX, Troll Blaster, Vibe Beat, or Ember Vale.",
     request: s.object({
-      game: s.enum(["runner", "blaster", "beat"] as const),
+      game: s.enum(["runner", "blaster", "beat", "ember"] as const),
       score: s.number().int().min(0).max(9999),
       maxCombo: s.number().int().min(0).max(999).default(0),
     }),

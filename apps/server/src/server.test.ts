@@ -342,6 +342,15 @@ describe("@memeagotchi/server HTTP + SQLite integration", () => {
     assert.equal(hwPlay.body.result.view.monster.name, "Blaze");
     assert.equal(hwPlay.body.result.view.monster.highScores.blaster.bestScore, 420);
 
+    // Ember Vale RPG Save & Exit cash-out over Bearer device auth
+    const emberPlay = await callRpc(
+      { authorization: `Bearer ${claimData.deviceToken}` },
+      "completeMiniGame",
+      { game: "ember", score: 850, maxCombo: 60 },
+    );
+    assert.equal(emberPlay.status, 200);
+    assert.equal(emberPlay.body.result.view.monster.highScores.ember.bestScore, 850);
+
     // 5. Real-time SSE Live Sync: open /api/events for Alice, trigger care via paired handheld -> receive state_updated!
     const sseAbort = new AbortController();
     const sseRes = await fetch(`${base}/api/events?deviceToken=${encodeURIComponent(claimData.deviceToken)}`, {

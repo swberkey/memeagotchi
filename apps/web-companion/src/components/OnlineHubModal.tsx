@@ -13,7 +13,7 @@ import {
 } from "../api";
 
 type HubTab = "account" | "pair" | "leaderboard";
-type BoardMetric = "xp" | "streak" | "runner" | "blaster" | "beat";
+type BoardMetric = "xp" | "streak" | "runner" | "blaster" | "beat" | "ember";
 
 function metricValue(e: LeaderboardEntry, m: BoardMetric): number {
   if (m === "xp") return e.xp;
@@ -392,6 +392,7 @@ export function OnlineHubModal({
                   ["runner", "🏃 Runner"],
                   ["blaster", "💥 Blaster"],
                   ["beat", "🎵 Vibe Beat"],
+                  ["ember", "⚔️ Ember Vale"],
                 ] as const
               ).map(([mId, lbl]) => (
                 <button

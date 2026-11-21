@@ -314,6 +314,15 @@ export const MINI_GAMES_CATALOG: readonly MiniGameDef[] = [
     tagline: "Hit incoming arrows & O/X notes on the beat while your monster dances!",
     controls: "D-Pad Arrows + O / X on Beat · -- Pause",
   },
+  {
+    id: "ember",
+    name: "Ember Vale",
+    shortName: "EMBER VALE",
+    glyph: "⚔️",
+    genre: "16-Bit Action-Adventure RPG",
+    tagline: "Explore 24 overworld screens, 2 castles & the Silly Meme Vault — cash out coins into Drip & XP!",
+    controls: "D-Pad Move · X Sword/Talk/Confirm · O Item/Back · -- Start Menu (Save & Exit)",
+  },
 ] as const;
 
 export const STAGES: readonly StageDef[] = [

@@ -15,10 +15,13 @@ Reference docs:
 - **Double-Buffer RAM:** `320 × 240 × 2 bytes = 153.6 KB` per RGB565 frame (`307.2 KB` double-buffered in ESP32-S3 PSRAM/SRAM).
 - **Always-On Carry Wake Sensors (Meme Dream Screensaver):** Pair a low-power I2C IMU (`LIS3DH` / `QMI8658` motion interrupt) + ambient light sensor (`BH1750` or LDR divider) + `INMP441` mic wake so the sleeping handheld automatically lights up into a full-screen 4:3 slideshow of the monster's fed memes with a gliding 1/8-size pixel sleeping sprite whenever it detects light, sound, or motion.
 
+## Bundled ESP32-S3 Firmware Addons
+- **[Ember Vale (`hardware/ember-vale/`)](./ember-vale/README.md):** Full 16-bit `320×240` top-down action-adventure RPG (`core/` portable C99 + `esp-idf/components/ember_vale/` ST7789 banded DMA component + `esp-idf/example_host/`). Runs the exact same C99 code on the ESP32-S3 handheld and inside the Web Companion / Handheld Simulator SNES Arcade (compiled to WASM).
+
 ## Pre-Hardware Entry Gate
 - [x] Core app & simulator unified on `packages/game-core`
 - [x] `320×240` (4:3) ST7789VW/ILI9341 display part, D-Pad + `O`/`X`/`--` control spec, and Light/Sound/Motion carry-wake spec locked
-- [x] 5 starter species + Title Screen + 3 SNES `320×240` games + Full-Screen `▲` Feed + Sleep Dream Screensaver built & verified
-- [ ] Cloud multi-user deployment (Supabase Auth/Postgres/Storage + Capacitor Android wrap)
+- [x] 5 starter species + Title Screen + 4 SNES `320×240` games (including Ember Vale C99/WASM RPG) + Full-Screen `▲` Feed + Sleep Dream Screensaver built & verified
+- [x] Cloud multi-user deployment live on Railway (`https://memeagotchi-production.up.railway.app`) with 6-char ESP32-S3 Bearer device pairing & real-time SSE sync
 - [ ] Export `packages/game-core` golden JSON test vectors for ESP32-S3 C/C++ firmware verification
-- [ ] Bench prototype: wire ESP32-S3 + 2.0" ST7789VW `320×240` + 7 tactile switches (direct GPIO or PCF8574 I2C expander) + INMP441/MAX98357A audio + LIS3DH/BH1750 wake sensors
+- [ ] Bench prototype: wire ESP32-S3 + 2.0" ST7789VW `320×240` + 7 tactile switches (direct GPIO or PCF8574 I2C expander) + INMP441/MAX98357A audio + LIS3DH/BH1750 wake sensors + link `hardware/ember-vale/esp-idf/components/ember_vale`

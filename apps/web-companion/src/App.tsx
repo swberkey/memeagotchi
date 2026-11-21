@@ -9,7 +9,15 @@ import {
   type SpeciesId,
 } from "@memeagotchi/game-core";
 import { CosmeticBadge, DreamScreensaver, MemeMonster, type DreamSlide } from "@memeagotchi/monster-ui";
-import { ArcadeGamepad, SnesArcadeCanvas, createGamepadController } from "@memeagotchi/snes-games";
+import {
+  ArcadeGamepad,
+  SnesArcadeCanvas,
+  cashOutEmberWallet,
+  createGamepadController,
+  eraseEmberSave,
+  getEmberSnapshot,
+  subscribeEmberStorage,
+} from "@memeagotchi/snes-games";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, fetchAuthMe, uploadMemeFile } from "./api";
@@ -101,7 +109,12 @@ export function App() {
   const [homeDrawer, setHomeDrawer] = useState<"activity" | "secrets" | "options">("activity");
   const [game, setGame] = useState<MiniGameId | null>("runner");
   const [gameResultBanner, setGameResultBanner] = useState("");
+  const [emberSnap, setEmberSnap] = useState(() => getEmberSnapshot());
+  const [emberWipeArmed, setEmberWipeArmed] = useState(false);
+  const [emberResetTick, setEmberResetTick] = useState(0);
   const gamepad = useMemo(() => createGamepadController(), []);
+
+  useEffect(() => subscribeEmberStorage(() => setEmberSnap(getEmberSnapshot())), []);
   const [newName, setNewName] = useState("");
   const [talkDraft, setTalkDraft] = useState("");
 
@@ -1433,8 +1446,8 @@ export function App() {
             ))}
           </section>
 
-          {/* 3 SNES Game Cards with Personal Bests */}
-          <div className="grid grid-cols-3 gap-2">
+          {/* 4 SNES Game Cartridges with Personal Bests */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             {MINI_GAMES_CATALOG.map((g) => {
               const hs = m.highScores[g.id];
               const active = game === g.id;
@@ -1459,7 +1472,9 @@ export function App() {
                   </div>
                   <p className="font-pixel text-xs mt-1 leading-tight">{g.shortName}</p>
                   <p className="text-[10px] text-[var(--dim)] mt-0.5 leading-tight">
-                    Max ×{hs.bestCombo} · {hs.plays} plays
+                    {g.id === "ember"
+                      ? `❤️${emberSnap.status.hearts} · 💎${emberSnap.status.crystals}/2 · 🪙${emberSnap.wallet.coins}`
+                      : `Max ×${hs.bestCombo} · ${hs.plays} plays`}
                   </p>
                 </button>
               );
@@ -1473,6 +1488,7 @@ export function App() {
                 <div className="max-w-[480px] mx-auto rounded-[24px] p-2.5 bg-[#090814] border-2 border-[#473c7d] shadow-2xl">
                   <div className="rounded-[14px] overflow-hidden">
                     <SnesArcadeCanvas
+                      key={game === "ember" ? `ember-${emberResetTick}` : game}
                       game={game}
                       species={m.species}
                       stage={m.displayStage}
@@ -1498,18 +1514,84 @@ export function App() {
                 <div className="max-w-[480px] mx-auto">
                   <ArcadeGamepad
                     controller={gamepad}
-                    specialLabel={m.speciesDef.specialMove.name}
+                    specialLabel={game === "ember" ? "Sword / OK" : m.speciesDef.specialMove.name}
+                    actionLabel={game === "ember" ? "Item / Back" : "Action"}
+                    menuLabel={game === "ember" ? "Start / Save" : "Pause / Menu"}
                   />
                   <p className="text-[11px] text-center text-[var(--dim)] mt-2">
-                    Keys: <b>Arrows/WASD</b> D-Pad · <b>Z/Space</b> O · <b>X/Shift</b> Special · <b>P/Esc</b> --
+                    {game === "ember" ? (
+                      <>
+                        Keys: <b>Arrows/WASD</b> Move · <b>X/J/Space</b> Sword/Talk · <b>Z/K/O</b> Item · <b>Enter/Esc</b> Start Menu (Save &amp; Exit)
+                      </>
+                    ) : (
+                      <>
+                        Keys: <b>Arrows/WASD</b> D-Pad · <b>Z/Space</b> O · <b>X/Shift</b> Special · <b>P/Esc</b> --
+                      </>
+                    )}
                   </p>
+
+                  {game === "ember" && (
+                    <div className="mt-3 rounded-2xl border border-[#f2a03d]/35 bg-[#191426]/90 p-3 space-y-2 text-xs">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="space-y-0.5">
+                          <p className="font-pixel text-[11px] text-[#f2a03d]">
+                            ⚔️ EMBER VALE · ESP32-S3 C99/WASM RPG
+                          </p>
+                          <p className="text-[11px] text-[var(--dim)]">
+                            ❤️ {emberSnap.status.hearts}/9 Hearts · 💎 {emberSnap.status.crystals}/2 Crystals ·{" "}
+                            {emberSnap.status.items.boomerang ? "🪃 " : ""}
+                            {emberSnap.status.items.bombs ? "💣 " : ""}
+                            {emberSnap.status.items.bow ? "🏹 " : ""}
+                            🪙 Wallet: <b className="text-[#fde047]">{emberSnap.wallet.coins}</b> (Lifetime {emberSnap.wallet.lifetimeCoins})
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            disabled={emberSnap.wallet.coins <= 0 || finishGameMut.isPending}
+                            onClick={() => {
+                              const res = cashOutEmberWallet();
+                              if (res.cashedCoins > 0) {
+                                finishGameMut.mutate({ game: "ember", score: res.score, maxCombo: res.maxCombo });
+                                setEmberResetTick((t) => t + 1);
+                                showToast(`🪙 Cashed out ${res.cashedCoins} Ember Vale coins into Drip & XP!`);
+                              }
+                            }}
+                            className="rounded-xl bg-[#f2a03d] px-3 py-1.5 text-[11px] font-extrabold text-[#1c1006] disabled:opacity-40"
+                          >
+                            💰 Cash Out ({emberSnap.wallet.coins})
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (!emberWipeArmed) {
+                                setEmberWipeArmed(true);
+                                setTimeout(() => setEmberWipeArmed(false), 3500);
+                                return;
+                              }
+                              setEmberWipeArmed(false);
+                              eraseEmberSave();
+                              setEmberResetTick((t) => t + 1);
+                              showToast("Ember Vale RPG save erased.");
+                            }}
+                            className="rounded-xl border border-rose-400/35 bg-rose-500/15 px-2.5 py-1.5 text-[11px] font-bold text-rose-200 hover:bg-rose-500/25"
+                          >
+                            {emberWipeArmed ? "Tap Again to Erase" : "Erase Save"}
+                          </button>
+                        </div>
+                      </div>
+                      <p className="text-[10.5px] text-[var(--dim)] leading-snug">
+                        Tip: Grab the boomerang in Pebble Cave, conquer Bramblekeep &amp; Cinderspire, and bomb cracked walls in Bonedry Basin to find the Silly Meme Vault. Press <b>-- (Enter)</b> → <b>SAVE &amp; EXIT</b> anytime to bank XP &amp; Drip!
+                      </p>
+                    </div>
+                  )}
                 </div>
               </>
             ) : (
               <p className="text-[var(--dim)] text-sm text-center py-8">
                 {trainBlockReason
                   ? "Take care of your monster first to unlock the 320×240 SNES Arcade!"
-                  : `Pick one of the 3 SNES cartridges above to train ${m.name}!`}
+                  : `Pick one of the ${MINI_GAMES_CATALOG.length} SNES cartridges above to train ${m.name}!`}
               </p>
             )}
           </div>

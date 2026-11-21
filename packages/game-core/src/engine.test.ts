@@ -10,6 +10,7 @@ import {
   feedMeme,
   hatchStarter,
   milestonePowersFor,
+  normalizeState,
   postBonusMeme,
   postMeme,
   renameMonster,
@@ -413,5 +414,23 @@ describe("@memeagotchi/game-core", () => {
     assert.equal(view.dreamMemes[0]!.inBelly, true);
     assert.equal(view.dreamMemes[1]!.memeKey, m1.key);
     assert.equal(view.dreamMemes[1]!.inBelly, false);
+  });
+
+  it("tracks Ember Vale RPG high scores, rewards XP/Drip/Happiness, and normalizes legacy saves missing ember", () => {
+    const legacy = createFreshState(T0, 60);
+    // Simulate a pre-Ember-Vale save lacking highScores.ember
+    const stripped = JSON.parse(JSON.stringify(legacy)) as Record<string, unknown>;
+    delete (stripped.highScores as Record<string, unknown>).ember;
+    const normalized = normalizeState(stripped as Partial<typeof legacy>, T0 + 1000);
+    assert.deepEqual(normalized.highScores.ember, { bestScore: 0, bestCombo: 0, plays: 0 });
+
+    const run = completeMiniGame(normalized, "ember", 650, T0 + 2000, 42);
+    assert.equal(run.ok, true);
+    assert.equal(run.state.highScores.ember.bestScore, 650);
+    assert.equal(run.state.highScores.ember.bestCombo, 42);
+    assert.equal(run.state.highScores.ember.plays, 1);
+    assert.ok(run.extra!.xpGained > 0);
+    assert.ok(run.extra!.dripGained > 0);
+    assert.ok(run.message.includes("Ember Vale"));
   });
 });

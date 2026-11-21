@@ -80,6 +80,7 @@ function freshHighScores(): Record<MiniGameId, HighScoreEntry> {
     runner: { bestScore: 0, bestCombo: 0, plays: 0 },
     blaster: { bestScore: 0, bestCombo: 0, plays: 0 },
     beat: { bestScore: 0, bestCombo: 0, plays: 0 },
+    ember: { bestScore: 0, bestCombo: 0, plays: 0 },
   };
 }
 
@@ -270,6 +271,7 @@ export function normalizeState(raw: Partial<GameState>, nowMs: number): GameStat
       runner: { ...base.highScores.runner, ...(raw.highScores?.runner ?? {}) },
       blaster: { ...base.highScores.blaster, ...(raw.highScores?.blaster ?? {}) },
       beat: { ...base.highScores.beat, ...(raw.highScores?.beat ?? {}) },
+      ember: { ...base.highScores.ember, ...(raw.highScores?.ember ?? {}) },
     },
     equipped: { ...(raw.equipped ?? {}) },
   };

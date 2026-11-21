@@ -39,10 +39,11 @@
 - [x] **Cloud Deploy Kit & PWA:** Added `render.yaml`, `fly.toml`, `railway.json`, `.env.example`, `apps/web-companion/public/manifest.webmanifest`, and [docs/online-deployment.md](../docs/online-deployment.md).
 - [x] **Verification:** Expanded `apps/server/src/server.test.ts` with end-to-end multi-user, pairing, revocation, community meme, leaderboard, and SSE live-push tests (**20/20 tests passing**).
 
-### Sprint 5 — Next Up (Live Cloud Launch, Grok Content Pack & ESP32-S3 Hardware Build)
-- [ ] Click Deploy on Railway / Render / Fly.io using `swberkey/memeagotchi` (`docs/online-deployment.md`) and test mobile PWA + live multiplayer!
+### Sprint 5 — Live Cloud Launch & Ember Vale 16-Bit RPG Arcade Expansion (In Progress)
+- [x] **Live Railway Production Deployment:** Deployed `swberkey/memeagotchi@main` to **`https://memeagotchi-production.up.railway.app`** with persistent 500 MB `/app/data` volume (`SQLite WAL` + uploads), `SESSION_SECRET`, HTTPS TLS, and auto-deploy on push to `main`.
+- [x] **4th SNES Arcade Cartridge — Ember Vale (C99/WASM + ESP32-S3):** Added the full `320×240` top-down action-adventure RPG (`ember`) to `@memeagotchi/game-core`, `@memeagotchi/snes-games` (lazy-loaded 250 KB Emscripten WASM module + persistent `save.dat`/`wallet.json`/`status.json` + host coin cash-out into Drip & XP), Web Companion (4-cartridge Arcade + Wallet Cash-Out bar + Global Leaderboard `⚔️ Ember Vale` tab), Handheld Simulator (2×2 `320×240` cartridge grid + adaptive `X`/`O`/`--` labels), and `hardware/ember-vale/` (C99 + ESP-IDF hardware component).
 - [ ] Grok session (GDD §5.3 Prompt 0.2): finalize 5 reserve secret words & expand all 5 starter species' Muse voice dialogue packs
-- [ ] Hardware Phase 1 breadboard: wire ESP32-S3-N16R8 (or Waveshare ESP32-S3 2" LCD Board) + 2.0" ST7789VW `320×240` SPI display + 7 tactile switches (D-Pad + `O`/`X`/`--`) + INMP441/MAX98357A audio + LIS3DH/BH1750 carry wake sensors and port `packages/game-core` to C/C++ verified against golden unit-test vectors
+- [ ] Hardware Phase 1 breadboard: wire ESP32-S3-N16R8 (or Waveshare ESP32-S3 2" LCD Board) + 2.0" ST7789VW `320×240` SPI display + 7 tactile switches (D-Pad + `O`/`X`/`--`) + INMP441/MAX98357A audio + LIS3DH/BH1750 carry wake sensors and integrate `hardware/ember-vale/` alongside the ported `packages/game-core` C/C++ engine
 
 ---
 

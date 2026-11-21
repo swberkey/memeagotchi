@@ -2,6 +2,7 @@ import { MINI_GAMES_CATALOG, SPECIES_BY_ID } from "@memeagotchi/game-core";
 import { useEffect, useMemo, useRef } from "react";
 import { createBeatEngine } from "./games/beat.ts";
 import { createBlasterEngine } from "./games/blaster.ts";
+import { EmberValeCanvas } from "./games/EmberValeCanvas.tsx";
 import { createRunnerEngine } from "./games/runner.ts";
 import { snesSfx } from "./sound.ts";
 import { drawSpeciesHero } from "./spriteDraw.ts";
@@ -28,7 +29,14 @@ function mapKeyToButton(code: string, key: string): GamepadButton | null {
   return null;
 }
 
-export function SnesArcadeCanvas({
+export function SnesArcadeCanvas(props: SnesArcadeCanvasProps) {
+  if (props.game === "ember") {
+    return <EmberValeCanvas {...props} />;
+  }
+  return <BuiltinSnesCanvas {...props} />;
+}
+
+function BuiltinSnesCanvas({
   game,
   species,
   stage,

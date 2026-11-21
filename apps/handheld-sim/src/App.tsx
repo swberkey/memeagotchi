@@ -938,12 +938,18 @@ export function App() {
 
       if (curMode === "games") {
         const total = MINI_GAMES_CATALOG.length;
-        if (btn === "up" || btn === "left") {
+        if (btn === "left") {
           blipNav();
           patchNav({ games: (n.games + total - 1) % total });
-        } else if (btn === "down" || btn === "right") {
+        } else if (btn === "right") {
           blipNav();
           patchNav({ games: (n.games + 1) % total });
+        } else if (btn === "up") {
+          blipNav();
+          patchNav({ games: (n.games + total - 2) % total });
+        } else if (btn === "down") {
+          blipNav();
+          patchNav({ games: (n.games + 2) % total });
         } else if (btn === "o") {
           const g = MINI_GAMES_CATALOG[n.games % total];
           if (g) launchGame(g.id);
@@ -1840,7 +1846,7 @@ export function App() {
                             </span>
                           }
                         />
-                        <div className="flex flex-1 flex-col justify-center gap-1.5">
+                        <div className="grid flex-1 min-h-0 grid-cols-2 grid-rows-2 gap-1.5">
                           {MINI_GAMES_CATALOG.map((g, i) => {
                             const sel = i === nav.games;
                             const hs = mon.highScores[g.id];
@@ -1852,23 +1858,29 @@ export function App() {
                                   patchNav({ games: i });
                                   launchGame(g.id);
                                 }}
-                                className="flex items-center gap-2.5 rounded-2xl border px-3 py-2 text-left transition-all"
+                                className="flex flex-col justify-between rounded-2xl border px-2.5 py-2 text-left transition-all min-w-0 overflow-hidden"
                                 style={{
-                                  borderColor: sel ? "#fde047" : "rgba(255,255,255,0.14)",
+                                  borderColor: sel ? "#fde047" : g.id === "ember" ? "rgba(242,160,61,0.45)" : "rgba(255,255,255,0.14)",
                                   background: sel
-                                    ? "linear-gradient(90deg, rgba(123,230,216,0.22), rgba(253,224,71,0.14))"
-                                    : "rgba(255,255,255,0.05)",
+                                    ? "linear-gradient(135deg, rgba(123,230,216,0.24), rgba(253,224,71,0.16))"
+                                    : g.id === "ember"
+                                      ? "linear-gradient(135deg, rgba(242,160,61,0.14), rgba(32,20,44,0.65))"
+                                      : "rgba(255,255,255,0.05)",
                                 }}
                               >
-                                <span className="text-2xl leading-none">{g.glyph}</span>
-                                <div className="min-w-0 flex-1">
-                                  <div className="flex items-center justify-between gap-2">
-                                    <span className={`font-game text-[10px] ${sel ? "text-[#fde047]" : "text-white"}`}>{g.name.toUpperCase()}</span>
-                                    <span className="rounded-full bg-black/40 px-2 py-0.5 font-mono text-[9.5px] font-bold text-[#7be6d8]">
-                                      BEST {hs.bestScore}
-                                    </span>
-                                  </div>
-                                  <p className="truncate text-[10px] text-white/75 mt-0.5">{g.genre} · Max ×{hs.bestCombo}</p>
+                                <div className="flex items-center justify-between gap-1">
+                                  <span className="text-lg leading-none">{g.glyph}</span>
+                                  <span className="rounded-full bg-black/45 px-1.5 py-0.5 font-mono text-[8.5px] font-bold text-[#7be6d8] whitespace-nowrap">
+                                    BEST {hs.bestScore}
+                                  </span>
+                                </div>
+                                <div className="min-w-0">
+                                  <p className={`font-game truncate text-[9.5px] ${sel ? "text-[#fde047]" : "text-white"}`}>
+                                    {g.shortName}
+                                  </p>
+                                  <p className="truncate text-[9px] text-white/70 mt-0.5">
+                                    {g.id === "ember" ? "16-Bit Action RPG" : g.genre}
+                                  </p>
                                 </div>
                               </button>
                             );
@@ -2257,7 +2269,9 @@ export function App() {
                   >
                     X
                   </button>
-                  <span className="font-mono text-[10px] font-bold" style={{ color: shell.textMuted }}>BACK / SP</span>
+                  <span className="font-mono text-[10px] font-bold" style={{ color: shell.textMuted }}>
+                    {mode === "play_game" && activeGame === "ember" ? "SWORD / OK" : "BACK / SP"}
+                  </span>
                 </div>
 
                 <div className="flex flex-col items-center gap-1 -mt-6">
@@ -2278,7 +2292,9 @@ export function App() {
                   >
                     O
                   </button>
-                  <span className="font-mono text-[10px] font-bold" style={{ color: shell.textMuted }}>OK / ACT</span>
+                  <span className="font-mono text-[10px] font-bold" style={{ color: shell.textMuted }}>
+                    {mode === "play_game" && activeGame === "ember" ? "ITEM / BACK" : "OK / ACT"}
+                  </span>
                 </div>
               </div>
 
@@ -2300,13 +2316,23 @@ export function App() {
                 >
                   --
                 </button>
-                <span className="font-mono text-[9.5px] font-bold" style={{ color: shell.textMuted }}>MENU / HOLD:🎙️</span>
+                <span className="font-mono text-[9.5px] font-bold" style={{ color: shell.textMuted }}>
+                  {mode === "play_game" && activeGame === "ember" ? "START / SAVE" : "MENU / HOLD:🎙️"}
+                </span>
               </div>
             </div>
           </div>
 
           <p className="mt-3 text-center text-[11px] font-medium" style={{ color: shell.textMuted }}>
-            Keys: <b>Arrows/WASD</b> D-Pad (<b>▲</b> Fullscreen in Feed) · <b>Z/Space/Enter</b> O · <b>X/Backspace</b> X · <b>Esc/P</b> --
+            {mode === "play_game" && activeGame === "ember" ? (
+              <>
+                Ember Vale: <b>Arrows/WASD</b> Move · <b>X/J/Space</b> Sword/OK · <b>Z/K/O</b> Item/Back · <b>Enter/Esc</b> Start Menu (Save &amp; Exit)
+              </>
+            ) : (
+              <>
+                Keys: <b>Arrows/WASD</b> D-Pad (<b>▲</b> Fullscreen in Feed) · <b>Z/Space/Enter</b> O · <b>X/Backspace</b> X · <b>Esc/P</b> --
+              </>
+            )}
           </p>
         </div>
 
