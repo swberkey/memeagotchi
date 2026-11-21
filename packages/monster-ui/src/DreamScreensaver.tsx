@@ -139,16 +139,24 @@ export function DreamScreensaver({
       className={`relative h-full w-full overflow-hidden bg-[#0a0a24] select-none ${className}`}
       aria-label={`${petName} sleeping dream screensaver`}
     >
-      {/* Background: Full-screen slideshow of fed memes */}
+      {/* Background: Full-screen fit-everything slideshow of fed memes (ambient blur fill + crisp object-contain) */}
       {activeSlide ? (
         activeSlide.src ? (
-          <img
-            key={activeSlide.id}
-            src={activeSlide.src}
-            alt={`Dreaming of ${activeSlide.title}`}
-            className="absolute inset-0 h-full w-full object-cover transition-opacity duration-700"
-            draggable={false}
-          />
+          <div key={activeSlide.id} className="absolute inset-0 overflow-hidden bg-[#0a0a24]">
+            <img
+              src={activeSlide.src}
+              alt=""
+              aria-hidden
+              className="pointer-events-none absolute inset-0 h-full w-full scale-110 object-cover opacity-35 blur-md"
+              draggable={false}
+            />
+            <img
+              src={activeSlide.src}
+              alt={`Dreaming of ${activeSlide.title}`}
+              className="relative z-[1] h-full w-full object-contain transition-opacity duration-700"
+              draggable={false}
+            />
+          </div>
         ) : (
           <div
             key={activeSlide.id}
