@@ -1,0 +1,27 @@
+{
+  "name": "memeagotchi-monorepo",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "engines": {
+    "node": ">=22.5.0"
+  },
+  "scripts": {
+    "dev": "concurrently -n api,web,sim -c cyan,green,yellow \"npm run dev -w @memeagotchi/server\" \"npm run dev -w @memeagotchi/web-companion\" \"npm run dev -w @memeagotchi/handheld-sim\"",
+    "dev:server": "node scripts/link-workspaces.mjs && npm run dev -w @memeagotchi/server",
+    "dev:web": "npm run dev -w @memeagotchi/web-companion",
+    "dev:sim": "npm run dev -w @memeagotchi/handheld-sim",
+    "build": "npm run build -w @memeagotchi/game-core && npm run build -w @memeagotchi/rpc-sdk && npm run build -w @memeagotchi/web-companion && npm run build -w @memeagotchi/handheld-sim && npm run build -w @memeagotchi/server",
+    "start": "npm run start -w @memeagotchi/server",
+    "typecheck": "npm run typecheck -w @memeagotchi/game-core && npm run typecheck -w @memeagotchi/rpc-sdk && npm run typecheck -w @memeagotchi/server && npm run typecheck -w @memeagotchi/web-companion && npm run typecheck -w @memeagotchi/handheld-sim",
+    "test": "node scripts/run-tests.mjs",
+    "check": "npm run typecheck && npm test && npm run build"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2",
+    "typescript": "^5.8.2"
+  }
+}

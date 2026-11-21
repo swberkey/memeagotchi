@@ -1,0 +1,245 @@
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap');
+@import "tailwindcss";
+
+:root {
+  color-scheme: dark;
+  --bg: #101116;
+  --surface: #1b1c22;
+  --text: #e8e6df;
+  --dim: #9a97a3;
+  --border: #2e2f38;
+  --accent: #ffb02e;
+  --radius: 12px;
+  --lcd: #9ee86e;
+  --lcd-bg: #0a0a24;
+  --shell: #23242a;
+  --gold: #ffd23f;
+  --ink: #0a0a24;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.font-pixel {
+  font-family: "VT323", ui-monospace, monospace;
+}
+
+.font-game {
+  font-family: "Press Start 2P", "VT323", ui-monospace, monospace;
+}
+
+.pixelated {
+  image-rendering: pixelated;
+}
+
+.snes-window {
+  background: linear-gradient(180deg, #35359f 0%, #23237a 55%, #191964 100%);
+  border: 3px solid #0a0a24;
+  border-radius: 8px;
+  box-shadow:
+    inset 0 0 0 2px #eef1ff,
+    inset 0 0 0 5px #101038,
+    inset 0 0 26px rgba(0, 0, 0, 0.45);
+  color: #fff;
+}
+
+.snes-bar {
+  background: linear-gradient(180deg, #35359f 0%, #23237a 60%, #191964 100%);
+  border: 3px solid #0a0a24;
+  box-shadow:
+    inset 0 0 0 2px #eef1ff,
+    inset 0 0 14px rgba(0, 0, 0, 0.4);
+  color: #fff;
+}
+
+.snes-banner {
+  background: linear-gradient(180deg, #ffe066 0%, #ffd23f 45%, #ffab2e 100%);
+  border: 3px solid #0a0a24;
+  border-radius: 8px;
+  box-shadow:
+    inset 0 0 0 2px #fff6cf,
+    0 3px 0 rgba(0, 0, 0, 0.35);
+  color: #40260a;
+}
+
+.snes-dots {
+  background-image: radial-gradient(rgba(255, 255, 255, 0.07) 1.5px, transparent 1.7px);
+  background-size: 9px 9px;
+}
+
+.snes-text {
+  text-shadow: 2px 2px 0 rgba(5, 5, 28, 0.65);
+}
+
+@keyframes pet-bob {
+  0%, 100% { transform: translateY(0) scale(1, 1); }
+  50% { transform: translateY(-5px) scale(1.02, 1.03); }
+}
+@keyframes pet-bounce {
+  0%, 100% { transform: translateY(0) scale(1, 1); }
+  22% { transform: translateY(3px) scale(1.09, 0.9); }
+  48% { transform: translateY(-14px) scale(0.93, 1.09); }
+  68% { transform: translateY(0) scale(1.07, 0.93); }
+  84% { transform: translateY(-4px) scale(0.98, 1.02); }
+}
+@keyframes monster-breathe {
+  0%, 100% { transform: scale(1, 1) translateY(0); }
+  50% { transform: scale(1.025, 1.04) translateY(-1.5px); }
+}
+.anim-monster-breathe { transform-box: fill-box; transform-origin: 50% 92%; animation: monster-breathe 2.8s ease-in-out infinite; }
+@keyframes pet-shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-3px); }
+  75% { transform: translateX(3px); }
+}
+@keyframes evo-flash {
+  0% { opacity: 0; }
+  20% { opacity: 1; }
+  80% { opacity: 1; }
+  100% { opacity: 0; }
+}
+@keyframes zzz-float {
+  0% { transform: translate(0, 0); opacity: 0; }
+  20% { opacity: 1; }
+  100% { transform: translate(10px, -22px); opacity: 0; }
+}
+@keyframes cursor-nudge {
+  0%, 100% { transform: translateX(0); }
+  50% { transform: translateX(5px); }
+}
+@keyframes screen-in {
+  0% { opacity: 0; transform: translateX(16px); }
+  100% { opacity: 1; transform: translateX(0); }
+}
+@keyframes sel-flash {
+  0% { opacity: 0.5; }
+  100% { opacity: 0; }
+}
+@keyframes star-twinkle {
+  0%, 100% { opacity: 0.25; }
+  50% { opacity: 1; }
+}
+@keyframes blink {
+  0%, 91%, 100% { transform: scaleY(1); }
+  94% { transform: scaleY(0.08); }
+  97% { transform: scaleY(1); }
+}
+.anim-blink { transform-box: fill-box; transform-origin: center; animation: blink 4.4s ease-in-out infinite; }
+@keyframes chew {
+  0%, 100% { transform: scaleY(1); }
+  50% { transform: scaleY(0.5); }
+}
+.anim-chew { transform-box: fill-box; transform-origin: center; animation: chew 0.26s ease-in-out infinite; }
+@keyframes wobble {
+  0%, 100% { transform: rotate(-2.4deg); }
+  50% { transform: rotate(2.4deg); }
+}
+.anim-wobble { transform-origin: 50% 92%; animation: wobble 1.7s ease-in-out infinite; }
+@keyframes growl {
+  0%, 14%, 100% { transform: translateX(0); }
+  3% { transform: translateX(-2.5px); }
+  6% { transform: translateX(2.5px); }
+  9% { transform: translateX(-2px); }
+  12% { transform: translateX(1.5px); }
+}
+.anim-growl { animation: growl 2.3s ease-in-out infinite; }
+@keyframes breathe {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.035); }
+}
+.anim-breathe { transform-origin: 50% 85%; animation: breathe 3.2s ease-in-out infinite; }
+@keyframes flicker {
+  0%, 100% { transform: scaleY(1) skewX(0deg); }
+  33% { transform: scaleY(1.14) skewX(-3deg); }
+  66% { transform: scaleY(0.92) skewX(3deg); }
+}
+.anim-flicker { transform-box: fill-box; transform-origin: 50% 100%; animation: flicker 0.5s ease-in-out infinite; }
+@keyframes wisp {
+  0% { transform: translateY(3px); opacity: 0; }
+  30% { opacity: 0.8; }
+  100% { transform: translateY(-11px); opacity: 0; }
+}
+.anim-wisp { animation: wisp 2.4s ease-out infinite; }
+@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+.anim-spin-slow { transform-box: fill-box; transform-origin: center; animation: spin 16s linear infinite; }
+.anim-spin-slower { transform-box: fill-box; transform-origin: center; animation: spin 26s linear infinite; }
+.anim-spin-rev { transform-box: fill-box; transform-origin: center; animation: spin 22s linear infinite reverse; }
+@keyframes glitch {
+  0%, 86%, 100% { transform: translateX(0); }
+  88% { transform: translateX(-3px); }
+  91% { transform: translateX(3px); }
+  94% { transform: translateX(-1.5px); }
+  97% { transform: translateX(2px); }
+}
+.anim-glitch { animation: glitch 1.9s steps(1, end) infinite; }
+@keyframes gem {
+  0%, 100% { opacity: 0.55; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.12); }
+}
+.anim-gem { transform-box: fill-box; transform-origin: center; animation: gem 1.7s ease-in-out infinite; }
+@keyframes cloud-drift {
+  from { transform: translateX(-7px); }
+  to { transform: translateX(11px); }
+}
+.anim-cloud { animation: cloud-drift 9s ease-in-out infinite alternate; }
+.anim-cloud2 { animation: cloud-drift 13s ease-in-out infinite alternate-reverse; }
+@keyframes feed-fly {
+  0% { transform: translateY(0) scale(1) rotate(0deg); opacity: 1; }
+  70% { opacity: 1; }
+  100% { transform: translateY(118%) scale(0.1) rotate(9deg); opacity: 0.85; }
+}
+.anim-feed-fly { animation: feed-fly 0.95s ease-in forwards; }
+@keyframes particle-float {
+  0% { transform: translate(-50%, -50%) scale(0.5); opacity: 1; }
+  100% { transform: translate(calc(-50% + var(--dx, 0px)), calc(-50% + var(--dy, -60px))) scale(1.2) rotate(24deg); opacity: 0; }
+}
+.anim-particle { animation: particle-float 1.15s ease-out forwards; }
+@keyframes num-pop {
+  0% { transform: scale(1.3); }
+  100% { transform: scale(1); }
+}
+.anim-num-pop { display: inline-block; animation: num-pop 0.3s ease-out; }
+@keyframes evo-out {
+  0% { opacity: 1; filter: brightness(1); transform: scale(1); }
+  40% { opacity: 1; filter: brightness(3.4); transform: scale(1.06); }
+  55% { opacity: 0; filter: brightness(5); transform: scale(1.18); }
+  100% { opacity: 0; }
+}
+.anim-evo-out { animation: evo-out 2.6s ease forwards; }
+@keyframes evo-in {
+  0%, 45% { opacity: 0; transform: scale(0.5); }
+  62% { opacity: 1; transform: scale(1.14); }
+  78% { transform: scale(0.95); }
+  100% { opacity: 1; transform: scale(1); }
+}
+.anim-evo-in { animation: evo-in 2.6s ease forwards; }
+
+.anim-bob { animation: pet-bob 1.6s ease-in-out infinite; }
+.anim-bounce { animation: pet-bounce 0.55s ease-in-out infinite; }
+.anim-shake { animation: pet-shake 0.3s ease-in-out infinite; }
+.anim-evo { animation: evo-flash 2.6s ease-in-out forwards; }
+.anim-zzz { animation: zzz-float 2.4s ease-out infinite; }
+.anim-cursor { animation: cursor-nudge 0.55s ease-in-out infinite; }
+.anim-screen-in { animation: screen-in 0.16s ease-out; }
+.anim-flash { animation: sel-flash 0.18s ease-out forwards; }
+.anim-twinkle { animation: star-twinkle 1.8s ease-in-out infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .anim-bob, .anim-bounce, .anim-shake, .anim-evo, .anim-zzz,
+  .anim-cursor, .anim-screen-in, .anim-flash, .anim-twinkle,
+  .anim-blink, .anim-chew, .anim-wobble, .anim-growl, .anim-breathe,
+  .anim-flicker, .anim-wisp, .anim-spin-slow, .anim-spin-slower,
+  .anim-spin-rev, .anim-glitch, .anim-gem, .anim-cloud, .anim-cloud2,
+  .anim-feed-fly, .anim-particle, .anim-num-pop, .anim-evo-out,
+  .anim-evo-in, .anim-monster-breathe { animation: none; }
+}
+
+@layer base {
+  button, [role="button"], select, summary, input:not([type="checkbox"], [type="radio"]) {
+    min-height: 2rem;
+  }
+}
