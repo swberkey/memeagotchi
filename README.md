@@ -1,14 +1,15 @@
 # MemeAgotchi
 
-A Tamagotchi-style virtual pet whose food, power source, and social currency are memes — unified across a **Web Companion App** and a **Landscape 280×240 ESP32-S3 Handheld Simulator** on one deterministic TypeScript game engine.
+A Tamagotchi-style virtual pet whose food, power source, and social currency are memes — unified across a **Web Companion App** and a **Landscape 320×240 (4:3) ESP32-S3 Handheld Simulator** on one deterministic TypeScript game engine.
 
-## What's Inside (v1.1 · 280×240 Edition)
+## What's Inside (v1.2 · 320×240 Edition)
 - **Title Screen & 5 Playable Starter Species:** Choose from **Mint Dragon (Mochi)**, **Spicy Imp (Scoville)**, **Cyber Cat (Pixel)**, **Cozy Frog (Pebbles)**, or **Cursed Ghost (Wisp)** — each with custom concept sheets in `docs/art/`, distinct stat-curve archetypes, voice banter, and an exclusive **`X` Signature Special Move**.
-- **3 60fps `280×240` SNES Mini-Games (`@memeagotchi/snes-games`):**
+- **3 60fps `320×240` (4:3) SNES Mini-Games (`@memeagotchi/snes-games`):**
   1. **Meme Runner DX** — SNES side-scrolling platformer with floating platforms, stompable enemies, double-jump, and species specials.
   2. **Troll Blaster** — 8-way top-down arena shooter with enemy waves and mini-bosses.
   3. **Vibe Beat** — Live WebAudio chiptune rhythm stage with dancing dressed-up monster and 5-lane beat highway (`◄ ▼ ▲ ► O` + `X` Special).
-- **Hardware Alignment (`1.69" ST7789V2 IPS TFT`):** 240×280 native panel rotated to **Landscape `280×240`** (262K color, 4-wire SPI, rounded glass corners) paired with an **ESP32-S3-WROOM-1** and tactile **4-way D-Pad + `O` / `X` / `--` (Hold `--` = Voice PTT)** controls.
+- **Full-Screen Meme Feed (`▲`) & Always-On Meme Dream Screensaver:** Press `▲` Up Arrow while feeding for edge-to-edge full-screen memes. While sleeping, Light / Sound / Motion wake the handheld into a full-screen 4:3 slideshow of the memes your monster has fed on, with a **1/8-size gliding pixel sleeping monster**.
+- **Hardware Alignment (`2.0" ST7789VW / 2.4" ILI9341 320×240 IPS TFT`):** 240×320 native panel rotated to **Landscape `320×240` (4:3 QVGA)** (262K color, 4-wire SPI) paired with an **ESP32-S3**, tactile **4-way D-Pad + `O` / `X` / `--`**, and Light/Sound/Motion carry-wake sensors.
 - **Full Progression Loop:** Personal Best High Scores & Max Combos per game, Daily Care Streak bonuses, and active **5 / 15 / 30 Digestion Milestone Powers** (`Turbo Charge`, `Second Wind`, `Meme Overdrive ×1.5`) usable in every mini-game.
 
 ## Monorepo Architecture
@@ -16,18 +17,18 @@ A Tamagotchi-style virtual pet whose food, power source, and social currency are
 ```text
 memeagotchi/
 ├── AGENTS.md                   # Shared multi-AI harness rules & invariants
-├── docs/                       # GDD v1.0 + v1.1 Addendum, 280×240 architecture, 5 species art sheets, contracts, ADRs
+├── docs/                       # GDD v1.0–v1.2, 320×240 architecture, 5 species art sheets, contracts, ADRs
 ├── tasks/                      # Live sprint board & bug audit log
 ├── packages/
 │   ├── game-core/              # Pure deterministic TS game engine (v3 schema) + golden unit tests
 │   ├── rpc-sdk/                # Open, zero-lock-in typed RPC layer
-│   ├── monster-ui/             # 5-species × 5-stage SVG art kit, starter eggs & 12 illustrated cosmetics
-│   └── snes-games/             # Shared 60fps 280×240 Canvas SNES Arcade Trio + on-screen D-Pad/O/X/-- Gamepad
+│   ├── monster-ui/             # 5-species × 5-stage SVG art kit, starter eggs, 12 cosmetics & Meme Dream Screensaver
+│   └── snes-games/             # Shared 60fps 320×240 (4:3) Canvas SNES Arcade Trio + on-screen D-Pad/O/X/-- Gamepad
 ├── apps/
 │   ├── server/                 # Node 22 HTTP + built-in SQLite API, uploads, & production static server
 │   ├── web-companion/          # React 19 + Vite + Tailwind v4 Companion App (served at /)
-│   └── handheld-sim/           # React 19 + Vite + Tailwind v4 280×240 Landscape Handheld Simulator (served at /handheld/)
-└── hardware/                   # ESP32-S3 + 1.69" ST7789V2 BOM, GPIO budget & Phase 1–3 build checklist
+│   └── handheld-sim/           # React 19 + Vite + Tailwind v4 320×240 (4:3) Landscape Handheld Simulator (served at /handheld/)
+└── hardware/                   # ESP32-S3 + 2.0" ST7789VW 320×240 BOM, wake sensors, GPIO budget & build checklist
 ```
 
 ## Quick Start (Requires Node.js ≥ 22.5)

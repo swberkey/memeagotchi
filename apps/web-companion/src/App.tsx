@@ -95,6 +95,7 @@ export function App() {
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [showTitle, setShowTitle] = useState(false);
+  const [homeDrawer, setHomeDrawer] = useState<"activity" | "secrets" | "options">("activity");
   const [game, setGame] = useState<MiniGameId | null>("runner");
   const [gameResultBanner, setGameResultBanner] = useState("");
   const gamepad = useMemo(() => createGamepadController(), []);
@@ -435,23 +436,24 @@ export function App() {
   if (m.activeBuffs.basedBoostReady) activeBuffBadges.push("⚡ Based ×2 Next Digest");
 
   return (
-    <div className="min-h-screen bg-[var(--bg)] app-texture text-[var(--text)] pb-24">
+    <div className="min-h-screen bg-[var(--bg)] app-texture text-[var(--text)] pb-28">
       {/* Top sync & simulator bar */}
-      <header className="sticky top-0 z-30 bg-[var(--bg)]/90 backdrop-blur border-b border-[var(--border)]">
-        <div className="max-w-2xl mx-auto px-4 py-2 flex items-center justify-between gap-2 text-xs">
-          <div className="flex items-center gap-1.5 min-w-0">
+      <header className="sticky top-0 z-30 bg-[#0e0b20]/85 backdrop-blur-xl border-b border-white/10">
+        <div className="max-w-2xl mx-auto px-4 py-2.5 flex items-center justify-between gap-2 text-xs">
+          <div className="flex items-center gap-2 min-w-0">
             <button
               type="button"
               onClick={() => setShowTitle(true)}
-              className="font-pixel text-[var(--accent)] text-sm truncate hover:brightness-110"
+              className="flex items-center gap-1.5 font-pixel text-[var(--accent)] text-sm truncate hover:brightness-110"
               title="Open Title Screen & Starter Picker"
             >
-              MEMEAGOTCHI
+              <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ background: m.speciesDef.accentColor }} />
+              <span>MEMEAGOTCHI</span>
             </button>
             <button
               type="button"
               onClick={() => setShowTitle(true)}
-              className="px-2 py-1 rounded-full bg-[var(--surface2)] border border-[var(--border)] text-[11px] font-bold hover:border-[var(--accent)]"
+              className="px-2.5 py-1 rounded-full bg-white/7 border border-white/12 text-[11px] font-bold hover:border-[var(--accent)]"
               title="Title Screen / Switch Starter"
             >
               🏠 Title
@@ -459,15 +461,15 @@ export function App() {
             <button
               type="button"
               onClick={() => settingsMut.mutate({ clock: view.settings.clock === 60 ? 1 : 60 })}
-              className="px-2 py-1 rounded-full bg-[var(--surface2)] border border-[var(--border)] text-[11px] font-bold hover:border-[var(--accent)]"
+              className="px-2.5 py-1 rounded-full bg-white/7 border border-white/12 text-[11px] font-bold hover:border-[var(--accent)]"
               title="Switch between Demo 60× speed and Real-Time GDD 1× speed"
             >
-              ⏱ {view.settings.clock === 60 ? "Demo 60×" : "Real-Time 1×"}
+              ⏱ {view.settings.clock === 60 ? "60× Demo" : "1× Live"}
             </button>
             <button
               type="button"
               onClick={() => settingsMut.mutate({ soundOn: !soundOn })}
-              className="px-2 py-1 rounded-full bg-[var(--surface2)] border border-[var(--border)] text-[11px]"
+              className="px-2 py-1 rounded-full bg-white/7 border border-white/12 text-[11px]"
               aria-label={soundOn ? "Mute sound effects" : "Enable sound effects"}
               title={soundOn ? "Sound On" : "Sound Off"}
             >
@@ -478,9 +480,9 @@ export function App() {
             href={HANDHELD_URL}
             target="_blank"
             rel="noreferrer"
-            className="px-2.5 py-1 rounded-full bg-[#ffd23f] text-[#141026] font-bold text-[11px] hover:brightness-110 shrink-0"
+            className="px-3 py-1.5 rounded-full bg-gradient-to-r from-[#fde047] to-[#fbbf24] text-[#141026] font-extrabold text-[11px] shadow hover:brightness-105 shrink-0"
           >
-            📟 280×240 Sim ↗
+            📟 320×240 Console ↗
           </a>
         </div>
       </header>
@@ -499,13 +501,17 @@ export function App() {
 
       {tab === "home" && (
         <main className="px-4 pt-4 max-w-2xl mx-auto">
-          {/* Tamagotchi Mint/Lavender Shell */}
+          {/* Boutique Species-Tinted Pocket Habitat Card */}
           <div
-            className="rounded-[2.1rem] p-3 border-4 border-[var(--border)] shadow-2xl"
-            style={{ background: "linear-gradient(155deg, #5b4bb7 0%, #7c5fd4 48%, #47b5b1 100%)" }}
+            className="rounded-[2.2rem] p-3 border-2 shadow-2xl"
+            style={{
+              background: `linear-gradient(150deg, #4b3da6 0%, #6d4ec9 48%, ${m.speciesDef.accentColor}cc 100%)`,
+              borderColor: `${m.speciesDef.accentColor}66`,
+              boxShadow: `0 20px 50px rgba(8, 5, 28, 0.55), 0 0 36px ${m.speciesDef.accentColor}22`,
+            }}
           >
             {m.isSleeping ? (
-              <div className="rounded-[1.6rem] h-[278px] viewport-screen relative overflow-hidden">
+              <div className="rounded-[1.6rem] aspect-[4/3] max-h-[340px] mx-auto viewport-screen relative overflow-hidden">
                 <DreamScreensaver
                   species={m.species}
                   stage={m.displayStage}
@@ -764,113 +770,140 @@ export function App() {
             )}
           </section>
 
-          {/* Nostalgia + Rename + Reset */}
-          <section className="mt-4 rounded-2xl panel border border-[var(--border)] p-4 space-y-3">
-            {m.stage >= 3 ? (
-              <div>
-                <h3 className="font-pixel text-xs mb-2">NOSTALGIA — DISPLAY OLDER LOOK</h3>
-                <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
-                  {STAGES.filter((s) => s.stage <= m.stage).map((st) => (
-                    <button
-                      type="button"
-                      key={st.stage}
-                      onClick={() => stageMut.mutate(st.stage)}
-                      className={`p-2 rounded-xl border text-center ${
-                        m.displayStage === st.stage
-                          ? "bg-[var(--accent)]/20 border-[var(--accent)] text-[var(--accent)] font-bold"
-                          : "border-[var(--border)] bg-[var(--bg)]/40"
-                      }`}
-                    >
-                      <div className="w-12 h-12 mx-auto">
-                        <MemeMonster species={m.species} displayStage={st.stage} actualStage={m.stage} mood="happy" />
-                      </div>
-                      <span className="text-[11px] block mt-1">{st.name}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ) : (
-              <p className="text-xs text-[var(--dim)]">
-                🔒 Nostalgia toggle unlocks at Stage 3 (Beast) — display any earlier look while keeping your Stage 5 aura.
-              </p>
-            )}
-            <div className="flex gap-2">
-              <input
-                aria-label="New monster name"
-                value={newName}
-                onChange={(e) => setNewName(e.target.value)}
-                placeholder={`Rename ${m.name}…`}
-                className="flex-1 min-w-0 bg-[var(--bg)]/60 border border-[var(--border)] rounded-xl px-3 py-2 text-sm"
-              />
-              <button
-                type="button"
-                disabled={!newName.trim() || renameMut.isPending}
-                onClick={() => renameMut.mutate(newName)}
-                className="px-4 py-2 rounded-xl bg-[var(--accent)] text-[#141026] font-bold text-sm disabled:opacity-40"
-              >
-                Save
-              </button>
-            </div>
-            <div className="pt-1 flex justify-end">
-              {!resetArmed ? (
+          {/* Organized 3-Tab Lower Drawer (Activity · Secrets · Pet Options) */}
+          <section className="mt-4 rounded-3xl panel border border-[var(--border)] p-4 space-y-3">
+            <div className="grid grid-cols-3 gap-1.5 rounded-2xl bg-[var(--bg)]/60 p-1 border border-white/8">
+              {(
+                [
+                  ["activity", `📡 Pulse (${view.events.length})`],
+                  ["secrets", `🔓 Secrets (${view.secrets.length}/10)`],
+                  ["options", "⚙️ Pet Options"],
+                ] as const
+              ).map(([key, lbl]) => (
                 <button
+                  key={key}
                   type="button"
-                  onClick={() => setResetArmed(true)}
-                  className="text-xs text-[var(--dim)] hover:text-rose-300 underline"
+                  onClick={() => setHomeDrawer(key)}
+                  className={`py-1.5 rounded-xl text-xs font-bold transition-all ${
+                    homeDrawer === key
+                      ? "bg-[var(--accent)] text-[#141026] shadow"
+                      : "text-[var(--dim)] hover:text-white"
+                  }`}
                 >
-                  Reset Pet
+                  {lbl}
                 </button>
-              ) : (
-                <div className="flex items-center gap-2 text-xs">
-                  <span className="text-rose-300">Hatch a fresh Blob?</span>
-                  <button
-                    type="button"
-                    onClick={() => resetMut.mutate()}
-                    className="px-2.5 py-1 rounded-lg bg-rose-600 text-white font-bold"
-                  >
-                    Confirm Reset
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setResetArmed(false)}
-                    className="px-2.5 py-1 rounded-lg bg-[var(--surface2)]"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              )}
+              ))}
             </div>
-          </section>
 
-          {/* Events + Secrets */}
-          <section className="mt-4 grid gap-4 sm:grid-cols-2">
-            <div className="rounded-2xl panel border border-[var(--border)] p-4">
-              <h3 className="font-pixel text-xs mb-2">FEED PULSE</h3>
+            {homeDrawer === "activity" && (
               <ul className="text-sm space-y-1.5 text-[var(--dim)]">
-                {view.events.slice(0, 8).map((e) => (
-                  <li key={e.id}>{e.text}</li>
+                {view.events.slice(0, 7).map((e) => (
+                  <li key={e.id} className="rounded-xl bg-white/4 px-3 py-1.5 border border-white/5">
+                    {e.text}
+                  </li>
                 ))}
               </ul>
-            </div>
-            <div className="rounded-2xl panel border border-[var(--border)] p-4">
-              <h3 className="font-pixel text-xs mb-2">SECRET MOVES ({view.secrets.length}/10)</h3>
-              {view.secrets.length === 0 ? (
-                <p className="text-sm text-[var(--dim)]">
-                  None yet. Type a famous meme phrase as a custom label on any meme — or say it to {m.name}! 👀
+            )}
+
+            {homeDrawer === "secrets" && (
+              <div className="space-y-2">
+                {view.secrets.length === 0 ? (
+                  <p className="text-sm text-[var(--dim)]">
+                    No secret moves unlocked yet. Type a famous meme phrase as a custom label on any meme — or say it to {m.name}! 👀
+                  </p>
+                ) : (
+                  <ul className="text-sm space-y-1.5">
+                    {view.secrets.map((s) => (
+                      <li key={s.word} className="rounded-xl bg-white/5 px-3 py-2 border border-white/8">
+                        🔓 <b className="text-white">{s.move}</b> — <span className="text-[var(--dim)]">{s.effect}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <p className="text-xs text-[var(--dim)]">
+                  Digestion Milestone Powers unlock at 5 / 15 / 30 lifetime digestions (currently <b className="text-white">{m.digestedCount}</b>).
                 </p>
-              ) : (
-                <ul className="text-sm space-y-1.5">
-                  {view.secrets.map((s) => (
-                    <li key={s.word}>
-                      🔓 <b>{s.move}</b> — <span className="text-[var(--dim)]">{s.effect}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-              <p className="text-xs text-[var(--dim)] mt-2">
-                Digestion milestones: 5 / 15 / 30 lifetime digestions (currently {m.digestedCount}).
-              </p>
-            </div>
+              </div>
+            )}
+
+            {homeDrawer === "options" && (
+              <div className="space-y-3">
+                {m.stage >= 3 ? (
+                  <div>
+                    <h3 className="font-pixel text-xs mb-2 text-[var(--accent)]">NOSTALGIA — DISPLAY OLDER LOOK</h3>
+                    <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+                      {STAGES.filter((s) => s.stage <= m.stage).map((st) => (
+                        <button
+                          type="button"
+                          key={st.stage}
+                          onClick={() => stageMut.mutate(st.stage)}
+                          className={`p-2 rounded-xl border text-center ${
+                            m.displayStage === st.stage
+                              ? "bg-[var(--accent)]/20 border-[var(--accent)] text-[var(--accent)] font-bold"
+                              : "border-[var(--border)] bg-[var(--bg)]/40"
+                          }`}
+                        >
+                          <div className="w-12 h-12 mx-auto">
+                            <MemeMonster species={m.species} displayStage={st.stage} actualStage={m.stage} mood="happy" />
+                          </div>
+                          <span className="text-[11px] block mt-1">{st.name}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-xs text-[var(--dim)]">
+                    🔒 Nostalgia toggle unlocks at Stage 3 (Beast) — display any earlier look while keeping your Stage 5 aura.
+                  </p>
+                )}
+                <div className="flex gap-2">
+                  <input
+                    aria-label="New monster name"
+                    value={newName}
+                    onChange={(e) => setNewName(e.target.value)}
+                    placeholder={`Rename ${m.name}…`}
+                    className="flex-1 min-w-0 bg-[var(--bg)]/60 border border-[var(--border)] rounded-xl px-3 py-2 text-sm"
+                  />
+                  <button
+                    type="button"
+                    disabled={!newName.trim() || renameMut.isPending}
+                    onClick={() => renameMut.mutate(newName)}
+                    className="px-4 py-2 rounded-xl bg-[var(--accent)] text-[#141026] font-bold text-sm disabled:opacity-40"
+                  >
+                    Save
+                  </button>
+                </div>
+                <div className="pt-1 flex justify-end">
+                  {!resetArmed ? (
+                    <button
+                      type="button"
+                      onClick={() => setResetArmed(true)}
+                      className="text-xs text-[var(--dim)] hover:text-rose-300 underline"
+                    >
+                      Reset Pet &amp; Pick New Starter
+                    </button>
+                  ) : (
+                    <div className="flex items-center gap-2 text-xs">
+                      <span className="text-rose-300">Return to Title &amp; pick new starter?</span>
+                      <button
+                        type="button"
+                        onClick={() => resetMut.mutate()}
+                        className="px-2.5 py-1 rounded-lg bg-rose-600 text-white font-bold"
+                      >
+                        Confirm Reset
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setResetArmed(false)}
+                        className="px-2.5 py-1 rounded-lg bg-[var(--surface2)]"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </section>
         </main>
       )}
@@ -1035,27 +1068,30 @@ export function App() {
                       </button>
                     </div>
                   )}
-                  <div className="p-4 flex gap-3" style={{ background: meme.bg }}>
-                    <div className="text-[#1e1b4b] min-w-0">
-                      <h3 className="font-bold leading-tight">
+                  <div
+                    className="p-4 flex gap-3 border-l-4 bg-white/[0.04]"
+                    style={{ borderLeftColor: meme.bg }}
+                  >
+                    <div className="min-w-0">
+                      <h3 className="font-bold text-white leading-tight">
                         {meme.emoji} {meme.title}{" "}
                         {meme.isFresh && (
-                          <span className="text-[10px] bg-emerald-600 text-white px-1.5 py-0.5 rounded-full align-middle">
+                          <span className="text-[10px] bg-emerald-500/25 border border-emerald-400/50 text-emerald-200 px-1.5 py-0.5 rounded-full align-middle">
                             FRESH +1
                           </span>
                         )}
                         {meme.isRotten && (
-                          <span className="text-[10px] bg-stone-700 text-white px-1.5 py-0.5 rounded-full align-middle">
+                          <span className="text-[10px] bg-stone-700 text-stone-200 px-1.5 py-0.5 rounded-full align-middle">
                             ROTTEN −2
                           </span>
                         )}
                       </h3>
-                      <p className="text-sm text-[#1e1b4b]/75">{meme.caption}</p>
+                      <p className="text-sm text-[var(--dim)] mt-0.5">{meme.caption}</p>
                     </div>
-                    <div className="ml-auto text-right shrink-0">
-                      <div className="font-pixel text-[#1e1b4b] text-lg">{meme.power}</div>
-                      <div className="text-[10px] text-[#1e1b4b]/65 font-bold">
-                        PWR · {meme.dominant.toUpperCase()}
+                    <div className="ml-auto text-right shrink-0 rounded-xl bg-black/30 border border-white/10 px-2.5 py-1 self-start">
+                      <div className="font-pixel text-[#fde047] text-base leading-tight">{meme.power}</div>
+                      <div className="text-[9px] text-[var(--dim)] font-bold">
+                        {meme.dominant.toUpperCase()}
                       </div>
                     </div>
                   </div>
@@ -1272,7 +1308,7 @@ export function App() {
         <main className="px-4 pt-4 max-w-2xl mx-auto space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
-              <h2 className="font-pixel text-xl">SNES ARCADE · 280×240</h2>
+              <h2 className="font-pixel text-xl">SNES ARCADE · 320×240</h2>
               <p className="text-sm text-[var(--dim)] mt-0.5">
                 Cost <b>5 Energy</b> → <b>+20 Happiness</b> + XP &amp; Drip (×{view.settings.xpMultiplier} XP · {m.speciesDef.name} special: <b>{m.speciesDef.specialMove.name}</b>).
               </p>
@@ -1372,12 +1408,12 @@ export function App() {
             })}
           </div>
 
-          {/* 280x240 SNES Screen + On-Screen D-Pad + O / X / -- Gamepad */}
-          <div className="rounded-3xl panel border-2 border-[var(--border)] p-4 space-y-3">
+          {/* 320x240 (4:3) SNES Screen + On-Screen D-Pad + O / X / -- Gamepad */}
+          <div className="rounded-3xl panel border border-white/12 p-4 space-y-3.5">
             {game && !trainBlockReason ? (
               <>
-                <div className="max-w-[440px] mx-auto rounded-[24px] p-2 bg-[#0d0c1d] border-4 border-[#3f336d] shadow-2xl">
-                  <div className="rounded-[18px] overflow-hidden">
+                <div className="max-w-[480px] mx-auto rounded-[24px] p-2.5 bg-[#090814] border-2 border-[#473c7d] shadow-2xl">
+                  <div className="rounded-[14px] overflow-hidden">
                     <SnesArcadeCanvas
                       game={game}
                       species={m.species}
@@ -1401,7 +1437,7 @@ export function App() {
                   </div>
                 </div>
 
-                <div className="max-w-[440px] mx-auto">
+                <div className="max-w-[480px] mx-auto">
                   <ArcadeGamepad
                     controller={gamepad}
                     specialLabel={m.speciesDef.specialMove.name}
@@ -1414,7 +1450,7 @@ export function App() {
             ) : (
               <p className="text-[var(--dim)] text-sm text-center py-8">
                 {trainBlockReason
-                  ? "Take care of your monster first to unlock the 280×240 SNES Arcade!"
+                  ? "Take care of your monster first to unlock the 320×240 SNES Arcade!"
                   : `Pick one of the 3 SNES cartridges above to train ${m.name}!`}
               </p>
             )}
@@ -1538,20 +1574,20 @@ export function App() {
         </main>
       )}
 
-      {/* Bottom nav */}
+      {/* Floating Glass Pill Bottom Nav */}
       <nav
         aria-label="Main sections"
-        className="fixed bottom-0 inset-x-0 bg-[var(--surface)]/95 backdrop-blur border-t border-[var(--border)]"
+        className="fixed bottom-3 inset-x-0 z-40 px-4 pointer-events-none"
       >
-        <div className="max-w-2xl mx-auto grid grid-cols-4">
+        <div className="pointer-events-auto max-w-md mx-auto grid grid-cols-4 gap-1 rounded-full bg-[#171333]/92 backdrop-blur-xl border border-white/15 p-1.5 shadow-[0_14px_34px_rgba(4,2,18,0.7)]">
           {(
             [
-              ["home", "🥚", "Monster"],
-              ["feed", "📰", "Feed"],
-              ["train", "🎮", "Train"],
-              ["dress", "👕", "Drip"],
+              ["home", "🥚", "Monster", 0],
+              ["feed", "📰", "Feed", view.belly.length],
+              ["train", "🎮", "Arcade", 0],
+              ["dress", "👕", "Drip", 0],
             ] as const
-          ).map(([t, icon, label]) => (
+          ).map(([t, icon, label, badge]) => (
             <button
               type="button"
               key={t}
@@ -1560,12 +1596,19 @@ export function App() {
                 sfx.tap(soundOn);
                 setTab(t);
               }}
-              className={`py-2 text-center ${tab === t ? "text-[var(--accent)]" : "text-[var(--dim)]"}`}
+              className={`relative py-1.5 rounded-full text-center transition-all ${
+                tab === t
+                  ? "bg-[var(--accent)]/20 text-[var(--accent)] shadow-inner"
+                  : "text-[var(--dim)] hover:text-white"
+              }`}
             >
-              <span className={`inline-block px-4 py-0.5 rounded-full text-xl leading-6 ${tab === t ? "bg-[var(--accent)]/20" : ""}`}>
-                {icon}
-              </span>
-              <span className="text-[11px] font-bold block">{label}</span>
+              <span className="text-lg leading-5 block">{icon}</span>
+              <span className="text-[10px] font-bold block mt-0.5">{label}</span>
+              {badge > 0 && (
+                <span className="absolute top-1 right-3 rounded-full bg-[#fde047] px-1.5 text-[9px] font-black text-[#141026]">
+                  {badge}
+                </span>
+              )}
             </button>
           ))}
         </div>

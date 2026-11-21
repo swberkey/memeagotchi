@@ -183,7 +183,7 @@ export const SPECIES_CATALOG: readonly SpeciesDef[] = [
       banter: [
         "New personal best incoming, nyah.",
         "Have you tried overclocking the memes?",
-        "Purr.exe running at 280×240.",
+        "Purr.exe running at 320×240.",
         "Wait till you see my Glitch Blink!",
       ],
     },
@@ -302,7 +302,7 @@ export const MINI_GAMES_CATALOG: readonly MiniGameDef[] = [
     shortName: "BLASTER",
     glyph: "💥",
     genre: "4-Way Top-Down Arena Shooter",
-    tagline: "Dodge and blast waves of Cringe Trolls & Bosses in a 280×240 arena!",
+    tagline: "Dodge and blast waves of Cringe Trolls & Bosses in a 320×240 arena!",
     controls: "D-Pad 8-Way Move · O Fire Meme Orbs · X Species Special · -- Pause",
   },
   {

@@ -4,7 +4,7 @@ import { MemeMonster, type EquippedDisplayItem } from "@memeagotchi/monster-ui";
 export type EquippedItem = EquippedDisplayItem;
 
 /**
- * Handheld 280x240 landscape monster renderer — delegates directly to the unified
+ * Handheld 320x240 (4:3) landscape monster renderer — delegates directly to the unified
  * @memeagotchi/monster-ui 5-species × 5-stage + 12-cosmetic character kit
  * so Companion and Handheld stay 100% cohesive.
  */

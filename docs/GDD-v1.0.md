@@ -214,3 +214,12 @@ See [ADR-002](./decisions/ADR-002-handheld-280x240-roster-games.md) for full rat
   - **30 digested — Meme Overdrive:** Start every mini-game with a `×1.5` Overdrive multiplier.
 - **Daily Care Streaks & High Scores:** Consecutive UTC care days award escalating Drip & XP bonuses; each of the 3 SNES games tracks personal best score, max combo, and play count.
 - **Nov 17 Sleep/Energy Tuning Preserved:** Base awake Energy decay `−1/hr`, Play/Mini-game cost `−5 Energy`, Sleep restore `+20/hr` (modified by species archetype multipliers).
+
+---
+
+## 12. v1.2 Addendum — `320×240` (4:3 QVGA) Display Standard, Full-Screen Feed & Always-On Meme Dream Screensaver
+
+See [ADR-003](./decisions/ADR-003-display-320x240-qvga-ui-redesign.md):
+- **Display Resolution Standardized to Landscape `320×240` (4:3 QVGA, 262K IPS):** Targets ubiquitous **2.0" ST7789VW** (or drop-in **2.4" ST7789/ILI9341**) SPI IPS modules (`153.6 KB` per RGB565 frame; `307.2 KB` double-buffered in ESP32-S3 RAM). All three SNES mini-games (`Meme Runner DX`, `Troll Blaster`, `Vibe Beat`) run natively at `320×240` (4:3).
+- **Full-Screen Meme Feed (`▲` Up Arrow):** Pressing `▲` while feeding toggles edge-to-edge full-screen meme viewing on both Handheld and Web Companion.
+- **Always-On Meme Dream Screensaver (Carry Wake):** While sleeping, ambient **Light, Sound, or Motion** wakes the display into a full-screen 4:3 slideshow of the memes the monster has fed on (`dreamMemes`), with a **1/8-size pixel sleeping monster sprite** gliding across the screen.

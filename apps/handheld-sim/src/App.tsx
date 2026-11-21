@@ -59,41 +59,97 @@ type Mode =
   | "post"
   | "settings";
 
+type ShellThemeId = "obsidian" | "lavender" | "mint" | "snes";
+
+interface ShellTheme {
+  id: ShellThemeId;
+  name: string;
+  swatch: string;
+  shellBg: string;
+  shellBorder: string;
+  textMuted: string;
+  wellBg: string;
+  dpadBg: string;
+  dpadText: string;
+}
+
+const SHELL_THEMES: readonly ShellTheme[] = [
+  {
+    id: "obsidian",
+    name: "Obsidian",
+    swatch: "#26233d",
+    shellBg: "linear-gradient(160deg, #2d2948 0%, #1d1a33 58%, #141226 100%)",
+    shellBorder: "rgba(196,181,253,0.22)",
+    textMuted: "#a49ec4",
+    wellBg: "radial-gradient(circle at 50% 50%, #100e20 0%, #1a1730 100%)",
+    dpadBg: "linear-gradient(180deg, #3c385c 0%, #26233d 100%)",
+    dpadText: "#f5f3ff",
+  },
+  {
+    id: "lavender",
+    name: "Atomic Purple",
+    swatch: "#7c5fd4",
+    shellBg: "linear-gradient(160deg, #6d55c7 0%, #523da6 55%, #3b2a82 100%)",
+    shellBorder: "rgba(233,213,255,0.4)",
+    textMuted: "#e5dcff",
+    wellBg: "radial-gradient(circle at 50% 50%, #2d1f66 0%, #422e8c 100%)",
+    dpadBg: "linear-gradient(180deg, #2a2444 0%, #1a1530 100%)",
+    dpadText: "#ffffff",
+  },
+  {
+    id: "mint",
+    name: "Mint Cream",
+    swatch: "#7be6d8",
+    shellBg: "linear-gradient(160deg, #b8fbf0 0%, #7be6d8 52%, #52c7be 100%)",
+    shellBorder: "rgba(255,255,255,0.65)",
+    textMuted: "#1a3c42",
+    wellBg: "radial-gradient(circle at 50% 50%, #3aa39d 0%, #58c2bb 100%)",
+    dpadBg: "linear-gradient(180deg, #2b2d47 0%, #1a1c30 100%)",
+    dpadText: "#ffffff",
+  },
+  {
+    id: "snes",
+    name: "Retro SNES",
+    swatch: "#d6d3df",
+    shellBg: "linear-gradient(160deg, #e5e3ec 0%, #cbc7d8 55%, #b1acc2 100%)",
+    shellBorder: "rgba(255,255,255,0.7)",
+    textMuted: "#47435c",
+    wellBg: "radial-gradient(circle at 50% 50%, #9b96ad 0%, #b7b2c7 100%)",
+    dpadBg: "linear-gradient(180deg, #3c3a4c 0%, #232230 100%)",
+    dpadText: "#ffffff",
+  },
+];
+
 const LABELS: Label[] = ["tasty", "spicy", "blech"];
 const LABEL_FACE: Record<Label, string> = { tasty: "TASTY +2", spicy: "SPICY +3", blech: "BLECH -1" };
-const LABEL_COLOR: Record<Label, string> = { tasty: "#37a24b", spicy: "#e2483d", blech: "#7a4fd0" };
+const LABEL_COLOR: Record<Label, string> = { tasty: "#10b981", spicy: "#ef4444", blech: "#8b5cf6" };
 
-const MENU: { id: Mode | "sleep"; label: string; glyph: string }[] = [
-  { id: "feed", label: "FEED", glyph: "🖼️" },
-  { id: "care", label: "CARE", glyph: "🧼" },
-  { id: "games", label: "ARCADE", glyph: "🎮" },
-  { id: "shop", label: "SHOP", glyph: "🛍️" },
-  { id: "bag", label: "BAG", glyph: "🎒" },
-  { id: "stats", label: "STATS", glyph: "📊" },
-  { id: "post", label: "POST", glyph: "📮" },
-  { id: "settings", label: "CONFIG", glyph: "⚙️" },
-  { id: "sleep", label: "SLEEP", glyph: "💤" },
-  { id: "title", label: "TITLE", glyph: "🏠" },
+const MENU: { id: Mode | "sleep"; label: string; glyph: string; tint: string }[] = [
+  { id: "feed", label: "FEED", glyph: "🖼️", tint: "#34d399" },
+  { id: "care", label: "CARE", glyph: "🧼", tint: "#38bdf8" },
+  { id: "games", label: "ARCADE", glyph: "🎮", tint: "#f472b6" },
+  { id: "shop", label: "SHOP", glyph: "🛍️", tint: "#fbbf24" },
+  { id: "bag", label: "BAG", glyph: "🎒", tint: "#a78bfa" },
+  { id: "stats", label: "STATS", glyph: "📊", tint: "#60a5fa" },
+  { id: "post", label: "POST", glyph: "📮", tint: "#fb923c" },
+  { id: "settings", label: "CONFIG", glyph: "⚙️", tint: "#94a3b8" },
+  { id: "sleep", label: "SLEEP", glyph: "💤", tint: "#818cf8" },
+  { id: "title", label: "TITLE", glyph: "🏠", tint: "#2dd4bf" },
 ];
 
-const CARE: { id: CareAction; label: string; glyph: string }[] = [
-  { id: "feed", label: "FEED KIBBLE", glyph: "🍖" },
-  { id: "groom", label: "GROOM", glyph: "🛁" },
-  { id: "play", label: "CARE PLAY", glyph: "🎾" },
-  { id: "sleep", label: "TUCK IN / SLEEP", glyph: "💤" },
+const CARE: { id: CareAction; label: string; glyph: string; desc: string; color: string }[] = [
+  { id: "feed", label: "KIBBLE", glyph: "🍖", desc: "+30 Fullness · +XP", color: "#34d399" },
+  { id: "groom", label: "GROOM", glyph: "🛁", desc: "+25 Hygiene · Sparkly", color: "#38bdf8" },
+  { id: "play", label: "PLAY", glyph: "🎾", desc: "+20 Happy · −5 Energy", color: "#f472b6" },
+  { id: "sleep", label: "SLEEP", glyph: "💤", desc: "Rest + Dream Saver", color: "#a78bfa" },
 ];
 
-const STAGE_COLORS = ["#8be04e", "#57c84a", "#3fc97e", "#2fbfae", "#b06ee8"];
+const STAGE_COLORS = ["#7be6d8", "#4ade80", "#38bdf8", "#fbbf24", "#c084fc"];
 const SECRET_HINTS = ["stonks", "doge", "chad", "rickroll", "sus", "rizz", "no cap", "L + ratio", "mid meme", "based and correct"];
 const URL_RE = /^https?:\/\/\S+$/i;
 const SETTINGS_COUNT = 4;
 
 const STAT_COLORS: Record<string, string> = {
-  Fullness: "#ff8a3c",
-  Happiness: "#ff5da2",
-  Hygiene: "#38bdf8",
-  Energy: "#ffd23f",
-  Heat: "#ff4747",
   FULLNESS: "#ff8a3c",
   HAPPY: "#ff5da2",
   HYGIENE: "#38bdf8",
@@ -101,37 +157,27 @@ const STAT_COLORS: Record<string, string> = {
   HEAT: "#ff4747",
 };
 
-function Pips({
-  label,
+function MiniStatBar({
   glyph,
   value,
   cap = 100,
+  color,
   heat,
 }: {
-  label: string;
   glyph: string;
   value: number;
   cap?: number;
+  color: string;
   heat?: boolean;
 }) {
-  const filled = Math.max(0, Math.min(5, Math.round((value / Math.max(1, cap)) * 5)));
-  const color = STAT_COLORS[label] ?? "#57e65c";
+  const pct = Math.min(100, Math.max(0, (value / Math.max(1, cap)) * 100));
+  const fill = heat && pct >= 75 ? "#fb7185" : value < 25 && !heat ? "#fb7185" : color;
   return (
-    <div className="flex items-center gap-[4px]" aria-label={`${label} ${value} of ${cap}`}>
-      <span className="w-[15px] text-[12px] leading-none">{glyph}</span>
-      <span className="flex gap-[2px]">
-        {[0, 1, 2, 3, 4].map((i) => (
-          <span
-            key={i}
-            className="inline-block h-[11px] w-[9px] transition-colors duration-300"
-            style={{
-              background: i < filled ? (heat && filled >= 4 ? "#ff4747" : color) : "rgba(255,255,255,0.14)",
-              border: "1.5px solid #0a0a24",
-              boxShadow: i < filled ? "inset 0 2px 0 rgba(255,255,255,0.4)" : undefined,
-            }}
-          />
-        ))}
-      </span>
+    <div className="flex items-center gap-1.5" title={`${value}/${cap}`}>
+      <span className="text-[11px] leading-none">{glyph}</span>
+      <div className="h-[7px] flex-1 overflow-hidden rounded-full bg-white/15 border border-black/50">
+        <div className="h-full rounded-full transition-all duration-300" style={{ width: `${pct}%`, background: fill }} />
+      </div>
     </div>
   );
 }
@@ -149,75 +195,49 @@ function StatRow({
   cap?: number;
   heat?: boolean;
 }) {
-  const filled = Math.max(0, Math.min(10, Math.round((value / Math.max(1, cap)) * 10)));
-  const color = heat && value >= cap * 0.75 ? "#ff4747" : (STAT_COLORS[label] ?? "#57e65c");
+  const pct = Math.min(100, Math.max(0, (value / Math.max(1, cap)) * 100));
+  const color = heat && pct >= 75 ? "#fb7185" : (STAT_COLORS[label] ?? "#7be6d8");
   return (
     <div className="flex items-center gap-2" aria-label={`${label} ${value} of ${cap}`}>
       <span className="w-[16px] text-[13px] leading-none">{glyph}</span>
-      <span className="font-game snes-text w-[86px] text-[9px] leading-none text-white">{label}</span>
-      <span className="flex flex-1 gap-[2px]">
-        {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map((i) => (
-          <span
-            key={i}
-            className="inline-block h-[11px] flex-1 transition-colors duration-300"
-            style={{
-              background: i < filled ? color : "rgba(255,255,255,0.13)",
-              border: "1.5px solid #0a0a24",
-              boxShadow: i < filled ? "inset 0 2px 0 rgba(255,255,255,0.4)" : undefined,
-            }}
-          />
-        ))}
-      </span>
-      <span className="font-pixel snes-text w-[42px] text-right text-[17px] leading-none text-white">
+      <span className="font-mono text-[10px] font-extrabold tracking-wider text-white/90 w-[68px]">{label}</span>
+      <div className="h-[10px] flex-1 overflow-hidden rounded-full bg-white/12 border border-black/60">
+        <div className="h-full rounded-full transition-all duration-300" style={{ width: `${pct}%`, background: color }} />
+      </div>
+      <span className="font-mono text-[11px] font-bold text-white w-[42px] text-right">
         {value}{cap > 100 ? `/${cap}` : ""}
       </span>
     </div>
   );
 }
 
-function ScreenText({ children, className = "" }: { children: React.ReactNode; className?: string }) {
-  return <p className={`font-pixel snes-text leading-none text-white ${className}`}>{children}</p>;
-}
-
-function Cursor() {
-  return (
-    <svg className="anim-cursor block shrink-0" width="15" height="12" viewBox="0 0 19 15" aria-hidden>
-      <polygon points="2,1.5 17,7.5 2,13.5 6,7.5" fill="#ffd23f" stroke="#0a0a24" strokeWidth="2.4" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
-function MenuRow({
-  selected,
-  onClick,
-  children,
+function ScreenHeader({
+  title,
+  right,
+  onBack,
 }: {
-  selected: boolean;
-  onClick?: () => void;
-  children: React.ReactNode;
+  title: string;
+  right?: React.ReactNode;
+  onBack?: () => void;
 }) {
   return (
     <div
-      onClick={onClick}
-      className={`flex min-h-0 flex-1 items-center gap-1 px-1.5 py-[2px] ${onClick ? "cursor-pointer" : ""}`}
-      style={{ background: selected ? "rgba(255,210,63,0.18)" : "transparent" }}
+      className="flex items-center justify-between gap-2 rounded-xl px-2.5 py-1.5 border border-white/15"
+      style={{ background: "linear-gradient(90deg, rgba(124,95,212,0.55), rgba(45,212,191,0.35))" }}
     >
-      <span className="flex w-[18px] shrink-0 items-center justify-center">{selected ? <Cursor /> : null}</span>
-      <div className={`font-game snes-text flex min-w-0 flex-1 items-center gap-1.5 text-[11px] leading-snug ${selected ? "text-[#ffd23f]" : "text-white"}`}>
-        {children}
+      <div className="flex items-center gap-1.5 min-w-0">
+        {onBack && (
+          <button
+            type="button"
+            onClick={onBack}
+            className="rounded-md bg-black/35 px-1.5 py-0.5 font-mono text-[9.5px] font-bold text-white/90 hover:bg-black/60"
+            title="Back (X)"
+          >
+            ←
+          </button>
+        )}
+        <span className="font-game truncate text-[10px] text-[#fde047] snes-text">{title}</span>
       </div>
-    </div>
-  );
-}
-
-function Banner({ title, right }: { title: string; right?: React.ReactNode }) {
-  return (
-    <div className="snes-banner flex items-center justify-between px-2.5 py-[6px]">
-      <span className="font-game flex items-center gap-1.5 text-[11px] leading-none">
-        <span aria-hidden className="text-[8px]">◆</span>
-        {title}
-        <span aria-hidden className="text-[8px]">◆</span>
-      </span>
       {right}
     </div>
   );
@@ -225,46 +245,47 @@ function Banner({ title, right }: { title: string; right?: React.ReactNode }) {
 
 type Tod = "day" | "evening" | "night";
 const STARS: { l: string; t: string; d: string }[] = [
-  { l: "8%", t: "10%", d: "0s" }, { l: "22%", t: "24%", d: "0.4s" }, { l: "38%", t: "8%", d: "0.9s" },
-  { l: "55%", t: "18%", d: "0.2s" }, { l: "70%", t: "6%", d: "1.1s" }, { l: "84%", t: "22%", d: "0.6s" },
-  { l: "92%", t: "12%", d: "1.4s" }, { l: "15%", t: "36%", d: "1.2s" }, { l: "64%", t: "32%", d: "0.8s" },
+  { l: "8%", t: "12%", d: "0s" }, { l: "22%", t: "24%", d: "0.4s" }, { l: "38%", t: "10%", d: "0.9s" },
+  { l: "55%", t: "19%", d: "0.2s" }, { l: "70%", t: "8%", d: "1.1s" }, { l: "84%", t: "22%", d: "0.6s" },
+  { l: "92%", t: "14%", d: "1.4s" }, { l: "15%", t: "36%", d: "1.2s" }, { l: "64%", t: "32%", d: "0.8s" },
 ];
 
 function SceneBg({ tod }: { tod: Tod }) {
   const sky =
     tod === "day"
-      ? "linear-gradient(180deg,#3f9bf0 0%,#7cc4ff 52%,#c8ecff 76%,#eafaff 100%)"
+      ? "linear-gradient(180deg, #38bdf8 0%, #7dd3fc 48%, #d6f5ff 78%, #f0fdf4 100%)"
       : tod === "evening"
-        ? "linear-gradient(180deg,#2e2a6e 0%,#7a3d8f 42%,#e05e7a 70%,#ffab4d 100%)"
-        : "linear-gradient(180deg,#04061f 0%,#101a45 55%,#1d3266 100%)";
-  const ground = tod === "night" ? "#1d4d2a" : tod === "evening" ? "#2f7a35" : "#3f9e3f";
-  const groundDark = tod === "night" ? "#12301b" : tod === "evening" ? "#256b2c" : "#358737";
+        ? "linear-gradient(180deg, #272262 0%, #6d3b8e 44%, #e26485 74%, #ffb76b 100%)"
+        : "linear-gradient(180deg, #090b29 0%, #192154 55%, #2b3878 100%)";
+  const hillBack = tod === "night" ? "#1e3a5f" : tod === "evening" ? "#4c3f7a" : "#6ee7b7";
+  const ground = tod === "night" ? "#1b4332" : tod === "evening" ? "#2d6a4f" : "#4ade80";
+  const groundDark = tod === "night" ? "#122b21" : tod === "evening" ? "#1f4d39" : "#22c55e";
   return (
     <div className="absolute inset-0" aria-hidden>
       <div className="absolute inset-0" style={{ background: sky }} />
       {tod === "night" &&
         STARS.map((s, i) => (
-          <span key={i} className="anim-twinkle absolute block h-[3px] w-[3px] bg-white" style={{ left: s.l, top: s.t, animationDelay: s.d }} />
+          <span key={i} className="anim-twinkle absolute block h-[3px] w-[3px] rounded-full bg-white" style={{ left: s.l, top: s.t, animationDelay: s.d }} />
         ))}
       {tod === "day" && (
         <div
-          className="absolute right-[9%] top-[9%] h-[28px] w-[28px] bg-[#ffd23f]"
-          style={{ boxShadow: "0 0 0 4px rgba(255,210,63,0.35), 0 0 28px 8px rgba(255,210,63,0.45)" }}
+          className="absolute right-[9%] top-[12%] h-[28px] w-[28px] rounded-full bg-[#fde047]"
+          style={{ boxShadow: "0 0 0 6px rgba(253,224,71,0.3), 0 0 28px 8px rgba(253,224,71,0.45)" }}
         />
       )}
       {tod !== "day" && (
-        <div className="absolute right-[10%] top-[9%] h-[26px] w-[26px] rounded-full" style={{ boxShadow: "inset -9px 3px 0 0 #f6f2da" }} />
+        <div className="absolute right-[10%] top-[12%] h-[26px] w-[26px] rounded-full" style={{ boxShadow: "inset -9px 3px 0 0 #fef9c3" }} />
       )}
       {tod !== "night" && (
         <>
-          <div className="anim-cloud absolute left-[8%] top-[14%] h-[10px] w-[40px] bg-white/90" style={{ boxShadow: "12px -6px 0 0 rgba(255,255,255,0.9), 26px 0 0 0 rgba(255,255,255,0.9)" }} />
-          <div className="anim-cloud2 absolute right-[15%] top-[25%] h-[9px] w-[32px] bg-white/70" style={{ boxShadow: "10px -6px 0 0 rgba(255,255,255,0.7), 22px 0 0 0 rgba(255,255,255,0.7)" }} />
+          <div className="anim-cloud absolute left-[8%] top-[18%] h-[11px] w-[42px] rounded-full bg-white/85" />
+          <div className="anim-cloud2 absolute right-[18%] top-[28%] h-[9px] w-[32px] rounded-full bg-white/65" />
         </>
       )}
-      <div className="absolute inset-x-[-10%] bottom-[13%] h-[14%] rounded-[100%] opacity-70" style={{ background: groundDark }} />
+      <div className="absolute inset-x-[-10%] bottom-[16%] h-[16%] rounded-[100%] opacity-65" style={{ background: hillBack }} />
       <div
-        className="absolute inset-x-0 bottom-0 h-[16%] border-t-[3px] border-[#0a0a24]/40"
-        style={{ background: `repeating-conic-gradient(${ground} 0% 25%, ${groundDark} 0% 50%)`, backgroundSize: "16px 16px" }}
+        className="absolute inset-x-0 bottom-0 h-[20%] border-t-2 border-black/25"
+        style={{ background: `linear-gradient(180deg, ${ground} 0%, ${groundDark} 100%)` }}
       />
     </div>
   );
@@ -346,6 +367,9 @@ export function App() {
     ...gameController.pressed,
   }));
   useEffect(() => gameController.subscribeState(setHwPressed), [gameController]);
+
+  const [shellId, setShellId] = useState<ShellThemeId>("obsidian");
+  const shell = SHELL_THEMES.find((s) => s.id === shellId) ?? SHELL_THEMES[0]!;
 
   const [mode, setMode] = useState<Mode>("pet");
   const [initRouted, setInitRouted] = useState(false);
@@ -458,7 +482,7 @@ export function App() {
     screenMsgTimer.current = setTimeout(() => setScreenMsg(""), 2800);
   }, []);
 
-  // Handheld UI Audio bleeps
+  // Audio bleeps
   const audioRef = useRef<AudioContext | null>(null);
   const soundOnRef = useRef(true);
   useEffect(() => {
@@ -625,6 +649,23 @@ export function App() {
     return null;
   }, []);
 
+  const launchGame = useCallback(
+    (gId: MiniGameId) => {
+      const block = gameBlock();
+      if (block) {
+        showScreenMsg(block);
+        blipBad();
+        return;
+      }
+      setFlash(Date.now());
+      setGameMsg("");
+      setActiveGame(gId);
+      setMode("play_game");
+      blipOk();
+    },
+    [gameBlock, showScreenMsg, blipBad, blipOk],
+  );
+
   // Unified D-Pad + O / X / -- Handler for non-game handheld screens
   const handleUiButton = useCallback(
     (btn: GamepadButton) => {
@@ -633,7 +674,6 @@ export function App() {
       const n = navRef.current;
       const curMode = modeRef.current;
 
-      // Sleeping pet: standby wakes into Dream Screensaver on any press; active Dream Saver browses with ◄► and wakes pet on O or --
       if (v.monster.isSleeping && curMode === "pet") {
         if (sleepStandbyRef.current) {
           setSleepStandby(false);
@@ -726,14 +766,11 @@ export function App() {
       }
 
       if (curMode === "menu") {
-        // 2-column × 5-row grid navigation
+        // 5-column × 2-row visual app icon launcher grid!
         const total = MENU.length;
-        if (btn === "up") {
+        if (btn === "up" || btn === "down") {
           blipNav();
-          patchNav({ menu: (n.menu + total - 2) % total });
-        } else if (btn === "down") {
-          blipNav();
-          patchNav({ menu: (n.menu + 2) % total });
+          patchNav({ menu: (n.menu + 5) % total });
         } else if (btn === "left") {
           blipNav();
           patchNav({ menu: (n.menu + total - 1) % total });
@@ -852,18 +889,7 @@ export function App() {
           patchNav({ games: (n.games + 1) % total });
         } else if (btn === "o") {
           const g = MINI_GAMES_CATALOG[n.games % total];
-          if (!g) return;
-          const block = gameBlock();
-          if (block) {
-            showScreenMsg(block);
-            blipBad();
-            return;
-          }
-          setFlash(Date.now());
-          setGameMsg("");
-          setActiveGame(g.id);
-          setMode("play_game");
-          blipOk();
+          if (g) launchGame(g.id);
         } else if (btn === "x" || btn === "menu") {
           blipNav();
           setMode("menu");
@@ -995,7 +1021,7 @@ export function App() {
       settingsMut,
       stageMut,
       resetMut,
-      gameBlock,
+      launchGame,
       showScreenMsg,
       flashSensorBadge,
       resetArm,
@@ -1046,7 +1072,6 @@ export function App() {
     [gameController, handleUiButton],
   );
 
-  // Keyboard bindings for handheld UI screens (SnesArcadeCanvas handles keyboard during play_game)
   useEffect(() => {
     const onKeyDown = (e: globalThis.KeyboardEvent) => {
       if (modeRef.current === "play_game") return;
@@ -1119,10 +1144,10 @@ export function App() {
   const settingsRows =
     view && mon
       ? [
-          `CLOCK: ${view.settings.clock === 1 ? "REAL-TIME 1×" : "DEMO 60×"}`,
-          `SOUND: ${view.settings.soundOn ? "ON 🔊" : "OFF 🔇"}`,
-          mon.stage >= 3 ? `LOOK: STG ${mon.displayStage} ${mon.displayStageName.toUpperCase()}` : "LOOK: 🔒 STAGE 3",
-          resetArm ? "RESET PET — PRESS O!" : "RESET PET → NEW STARTER",
+          `CLOCK SPEED: ${view.settings.clock === 1 ? "REAL-TIME 1×" : "DEMO 60×"}`,
+          `CHIPTUNE AUDIO: ${view.settings.soundOn ? "ON 🔊" : "OFF 🔇"}`,
+          mon.stage >= 3 ? `NOSTALGIA LOOK: STG ${mon.displayStage}` : "NOSTALGIA LOOK: 🔒 STG 3",
+          resetArm ? "CONFIRM RESET? PRESS O" : "RESET PET → NEW STARTER",
         ]
       : [];
 
@@ -1168,118 +1193,168 @@ export function App() {
     [careMut, flashSensorBadge, blipOk],
   );
 
+  const dpadBtnStyle = (active: boolean) => ({
+    background: active
+      ? "linear-gradient(180deg, #99f6e4 0%, #2dd4bf 100%)"
+      : shell.dpadBg,
+    color: active ? "#141026" : shell.dpadText,
+    borderColor: "#0c0a18",
+    boxShadow: active
+      ? "0 0 12px rgba(123,230,216,0.6), inset 0 1px 0 rgba(255,255,255,0.5)"
+      : "inset 0 1px 0 rgba(255,255,255,0.16), 0 2px 5px rgba(0,0,0,0.45)",
+    transform: active ? "translateY(1px)" : undefined,
+  });
+
   return (
-    <div className="min-h-screen bg-[var(--bg)] text-[var(--text)]">
-      <main className="mx-auto flex max-w-[880px] flex-col items-center px-3 pb-10 pt-4">
-        {/* Top nav bar */}
-        <div className="mb-2 flex w-full max-w-[800px] items-center justify-between text-xs">
-          <a
-            href={COMPANION_URL}
-            className="rounded-full border border-[var(--border)] bg-[var(--surface)] px-3 py-1 font-bold text-[#7be6d8] hover:brightness-110"
-          >
-            ← Companion App
-          </a>
-          <span className="text-[var(--dim)]">1.69" ST7789V2 · 280×240 IPS · Live Synced</span>
+    <div className="min-h-screen text-[var(--text)]">
+      <main className="mx-auto flex max-w-[940px] flex-col items-center px-3 pb-12 pt-4">
+        {/* Top bar: Companion link + Collectible Shell Colorway Swatches */}
+        <div className="mb-3 flex w-full max-w-[880px] flex-wrap items-center justify-between gap-2 text-xs">
+          <div className="flex items-center gap-2">
+            <a
+              href={COMPANION_URL}
+              className="rounded-full border border-[var(--border)] bg-[var(--surface)]/90 px-3.5 py-1.5 font-bold text-[#7be6d8] hover:border-[#7be6d8]"
+            >
+              ← Web Companion
+            </a>
+            <span className="hidden sm:inline-block rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-semibold text-[var(--dim)]">
+              2.0" ST7789VW · 320×240 (4:3) IPS
+            </span>
+          </div>
+
+          {/* Live Pocket Shell Colorway Switcher */}
+          <div className="flex items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--surface)]/90 px-2.5 py-1">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--dim)] px-1">Shell:</span>
+            {SHELL_THEMES.map((th) => (
+              <button
+                key={th.id}
+                type="button"
+                onClick={() => setShellId(th.id)}
+                title={`${th.name} Shell`}
+                aria-label={`${th.name} console shell`}
+                style={{ background: th.swatch, minHeight: "22px", width: "22px", height: "22px" }}
+                className={`rounded-full border-2 shrink-0 transition-transform ${
+                  shellId === th.id ? "scale-110 border-[#fde047] ring-2 ring-[#fde047]/40" : "border-black/40 opacity-80 hover:opacity-100"
+                }`}
+              />
+            ))}
+          </div>
         </div>
 
-        <h1 className="font-game text-center text-[17px] sm:text-[19px] leading-relaxed text-[#ffd23f]" style={{ textShadow: "3px 3px 0 rgba(0,0,0,0.5)" }}>
-          MEMEAGOTCHI-280
-          <span className="font-pixel mt-0.5 block text-[17px] tracking-widest text-[var(--dim)]" style={{ textShadow: "none" }}>
-            ESP32-S3 LANDSCAPE HANDHELD · 280×240 · 262K COLOR IPS
-          </span>
-        </h1>
-
-        {/* Landscape Micro-Console Shell */}
+        {/* Boutique Landscape 320x240 (4:3) Micro-Console Shell */}
         <div
-          className="mt-3 w-full max-w-[820px] rounded-[42px] border-2 border-black/70 px-4 py-4 sm:px-6 sm:py-5 shadow-[0_22px_60px_rgba(0,0,0,0.6),inset_0_2px_0_rgba(255,255,255,0.1)]"
-          style={{ background: "linear-gradient(165deg, #2a283d 0%, #1d1c2b 65%, #161522 100%)" }}
+          className="w-full max-w-[880px] rounded-[46px] border-2 px-4 py-4 sm:px-7 sm:py-5 transition-all duration-300"
+          style={{
+            background: shell.shellBg,
+            borderColor: shell.shellBorder,
+            boxShadow:
+              "0 28px 70px rgba(4, 2, 16, 0.72), inset 0 2px 1px rgba(255,255,255,0.22), inset 0 -6px 16px rgba(0,0,0,0.25)",
+          }}
         >
-          {/* Hardware top bezel markings */}
+          {/* Top Molded Console Branding Strip */}
           <div className="mb-3 flex items-center justify-between px-2">
             <div className="flex items-center gap-2">
               <span
-                className={`inline-block h-2.5 w-2.5 rounded-full ${
-                  pttActive ? "bg-rose-400 shadow-[0_0_10px_#fb7185]" : "bg-[#7be6d8] shadow-[0_0_8px_#7be6d8]"
-                }`}
+                className="inline-block h-2.5 w-2.5 rounded-full transition-colors"
+                style={{
+                  background: pttActive ? "#fb7185" : (mon?.speciesDef.accentColor ?? "#7be6d8"),
+                  boxShadow: `0 0 10px ${pttActive ? "#fb7185" : (mon?.speciesDef.accentColor ?? "#7be6d8")}`,
+                }}
                 aria-hidden
               />
-              <span className="font-pixel text-[14px] tracking-widest text-[#9d9bb0]">
-                MEMEAGOTCHI-280 · ST7789V2 280×240 · {pttActive ? "🎙️ MIC PTT" : "WIFI SYNC"}
+              <span className="font-game text-[10px] tracking-wider" style={{ color: shell.textMuted }}>
+                MEMEAGOTCHI-320
+              </span>
+              <span className="hidden sm:inline font-mono text-[10px] font-bold opacity-75" style={{ color: shell.textMuted }}>
+                · ESP32-S3 · 320×240 IPS · {pttActive ? "🎙️ MIC PTT" : "LIVE SYNC"}
               </span>
             </div>
+            {/* Speaker grille */}
             <span className="flex gap-1.5" aria-hidden>
               {[0, 1, 2, 3, 4].map((i) => (
-                <span key={i} className="h-[5px] w-[5px] rounded-full bg-black/60 shadow-inner" />
+                <span key={i} className="h-[5px] w-[5px] rounded-full bg-black/45 shadow-inner" />
               ))}
             </span>
           </div>
 
-          {/* 3-Column Landscape Console Body */}
+          {/* 3-Column Ergonomic Handheld Deck */}
           <div className="grid grid-cols-1 md:grid-cols-[136px_1fr_144px] items-center gap-4">
-            {/* LEFT WING: 4-Way Tactile D-Pad */}
-            <div className="order-2 md:order-1 flex md:flex-col items-center justify-around md:justify-center gap-3">
-              <div className="grid grid-cols-3 grid-rows-3 gap-[3px]" role="group" aria-label="4-Way D-Pad">
-                <div />
-                <button
-                  type="button"
-                  aria-label="D-Pad Up"
-                  {...bindHw("up")}
-                  className={`h-10 w-10 rounded-t-lg border-2 border-[#090814] font-bold text-sm flex items-center justify-center shadow-md ${
-                    hwPressed.up ? "bg-[#7be6d8] text-[#141026] translate-y-[1px]" : "bg-[#34314a] text-white hover:bg-[#403c5a]"
-                  }`}
-                >
-                  ▲
-                </button>
-                <div />
-                <button
-                  type="button"
-                  aria-label="D-Pad Left"
-                  {...bindHw("left")}
-                  className={`h-10 w-10 rounded-l-lg border-2 border-[#090814] font-bold text-sm flex items-center justify-center shadow-md ${
-                    hwPressed.left ? "bg-[#7be6d8] text-[#141026] translate-y-[1px]" : "bg-[#34314a] text-white hover:bg-[#403c5a]"
-                  }`}
-                >
-                  ◄
-                </button>
-                <div className="h-10 w-10 bg-[#27243a] border border-[#090814]/50 flex items-center justify-center">
-                  <span className="h-3 w-3 rounded-full bg-[#181626] shadow-inner" />
+            {/* LEFT WING: Recessed 4-Way Cross D-Pad */}
+            <div className="order-2 md:order-1 flex md:flex-col items-center justify-around md:justify-center gap-2.5">
+              <div
+                className="rounded-full p-2.5"
+                style={{
+                  background: shell.wellBg,
+                  boxShadow: "inset 0 4px 10px rgba(0,0,0,0.55), 0 1px 0 rgba(255,255,255,0.12)",
+                }}
+              >
+                <div className="grid grid-cols-3 grid-rows-3 gap-[2px]" role="group" aria-label="4-Way D-Pad">
+                  <div />
+                  <button
+                    type="button"
+                    aria-label="D-Pad Up"
+                    {...bindHw("up")}
+                    style={dpadBtnStyle(hwPressed.up)}
+                    className="h-9 w-9 rounded-t-lg border font-bold text-xs flex items-center justify-center"
+                  >
+                    ▲
+                  </button>
+                  <div />
+                  <button
+                    type="button"
+                    aria-label="D-Pad Left"
+                    {...bindHw("left")}
+                    style={dpadBtnStyle(hwPressed.left)}
+                    className="h-9 w-9 rounded-l-lg border font-bold text-xs flex items-center justify-center"
+                  >
+                    ◄
+                  </button>
+                  <div className="h-9 w-9 flex items-center justify-center" style={{ background: "#232038" }}>
+                    <span className="h-3 w-3 rounded-full bg-black/60 shadow-inner" />
+                  </div>
+                  <button
+                    type="button"
+                    aria-label="D-Pad Right"
+                    {...bindHw("right")}
+                    style={dpadBtnStyle(hwPressed.right)}
+                    className="h-9 w-9 rounded-r-lg border font-bold text-xs flex items-center justify-center"
+                  >
+                    ►
+                  </button>
+                  <div />
+                  <button
+                    type="button"
+                    aria-label="D-Pad Down"
+                    {...bindHw("down")}
+                    style={dpadBtnStyle(hwPressed.down)}
+                    className="h-9 w-9 rounded-b-lg border font-bold text-xs flex items-center justify-center"
+                  >
+                    ▼
+                  </button>
+                  <div />
                 </div>
-                <button
-                  type="button"
-                  aria-label="D-Pad Right"
-                  {...bindHw("right")}
-                  className={`h-10 w-10 rounded-r-lg border-2 border-[#090814] font-bold text-sm flex items-center justify-center shadow-md ${
-                    hwPressed.right ? "bg-[#7be6d8] text-[#141026] translate-y-[1px]" : "bg-[#34314a] text-white hover:bg-[#403c5a]"
-                  }`}
-                >
-                  ►
-                </button>
-                <div />
-                <button
-                  type="button"
-                  aria-label="D-Pad Down"
-                  {...bindHw("down")}
-                  className={`h-10 w-10 rounded-b-lg border-2 border-[#090814] font-bold text-sm flex items-center justify-center shadow-md ${
-                    hwPressed.down ? "bg-[#7be6d8] text-[#141026] translate-y-[1px]" : "bg-[#34314a] text-white hover:bg-[#403c5a]"
-                  }`}
-                >
-                  ▼
-                </button>
-                <div />
               </div>
-              <span className="font-pixel text-[13px] tracking-widest text-[#8f8da3] hidden md:block">D-PAD</span>
+              <span className="font-mono text-[10px] font-bold tracking-widest hidden md:block" style={{ color: shell.textMuted }}>
+                D-PAD
+              </span>
             </div>
 
-            {/* CENTER: 280x240 (7:6) Rounded-Corner 262K IPS Display */}
-            <div className="order-1 md:order-2 mx-auto w-full max-w-[448px] rounded-[28px] bg-[#090914] p-2.5 shadow-[inset_0_4px_14px_rgba(0,0,0,0.85)] border-2 border-black">
+            {/* CENTER: Flush Glass-Lensed 320x240 (4:3) 262K Color IPS Display */}
+            <div
+              className="order-1 md:order-2 mx-auto w-full max-w-[496px] rounded-[24px] p-2.5 border-2 border-black"
+              style={{
+                background: "linear-gradient(155deg, #161524 0%, #090812 100%)",
+                boxShadow: "inset 0 2px 12px rgba(0,0,0,0.9), 0 6px 20px rgba(0,0,0,0.45)",
+              }}
+            >
               <div
-                className="relative w-full aspect-[7/6] overflow-hidden rounded-[22px] border-2 border-[#1e1e36]"
-                style={{ background: "#0a0a24" }}
+                className="relative w-full aspect-[4/3] overflow-hidden rounded-[15px] border border-white/10"
+                style={{ background: "#0b0920" }}
               >
                 {pet.isPending || !view || !mon ? (
                   <div className="flex h-full items-center justify-center">
-                    <div className="snes-window px-6 py-4">
-                      <p className="font-game text-[12px] text-white">BOOTING 280×240…</p>
+                    <div className="rounded-2xl border border-white/20 bg-[#1a1638] px-6 py-4 text-center">
+                      <p className="font-game text-[11px] text-[#7be6d8]">BOOTING 320×240…</p>
                     </div>
                   </div>
                 ) : mode === "play_game" ? (
@@ -1309,100 +1384,142 @@ export function App() {
                   <div key={screenKey} className="anim-screen-in absolute inset-0">
                     {/* TITLE SCREEN */}
                     {mode === "title" ? (
-                      <div className="snes-dots flex h-full flex-col justify-between p-3" style={{ background: "linear-gradient(180deg,#1e1a58 0%,#121036 100%)" }}>
+                      <div
+                        className="flex h-full flex-col justify-between p-3"
+                        style={{ background: "radial-gradient(circle at 50% 0%, #312573 0%, #141033 70%, #0b0920 100%)" }}
+                      >
                         <div className="text-center">
-                          <span className="font-game snes-text text-[15px] text-[#ffd23f]">MEMEAGOTCHI</span>
-                          <p className="font-pixel text-[14px] text-[#7be6d8]">280×240 · 5-STARTER EDITION</p>
+                          <span className="font-game text-[15px] text-transparent bg-clip-text bg-gradient-to-r from-[#7be6d8] via-[#fde047] to-[#f472b6]">
+                            MEMEAGOTCHI
+                          </span>
+                          <p className="font-mono text-[10px] font-bold text-[#a6a0c4]">320×240 QVGA · 5-STARTER EDITION</p>
                         </div>
 
                         {view.hatched ? (
-                          <div className="flex items-center justify-center gap-3 px-2">
-                            <div className="h-[88px] w-[88px] shrink-0 anim-bob">
+                          <div className="flex items-center justify-center gap-3 rounded-2xl border border-white/12 bg-white/6 px-3 py-2">
+                            <div className="h-[84px] w-[84px] shrink-0 anim-bob">
                               <Monster species={mon.species} stage={mon.displayStage} actualStage={mon.stage} mood="excited" equipped={view.equippedItems} />
                             </div>
-                            <div className="min-w-0 text-left">
-                              <p className="font-game truncate text-[11px] text-[#7be6d8]">{mon.name.toUpperCase()}</p>
-                              <p className="font-pixel text-[15px] text-white">{mon.speciesDef.name.toUpperCase()}</p>
-                              <p className="font-pixel text-[14px] text-[#ffd23f]">STG {mon.stage} · ⭐{mon.xp} · 🔥{mon.careStreak.count}D</p>
+                            <div className="min-w-0 text-left space-y-0.5">
+                              <p className="font-game truncate text-[11px]" style={{ color: mon.speciesDef.accentColor }}>
+                                {mon.name.toUpperCase()}
+                              </p>
+                              <p className="text-[11px] font-bold text-white/90">
+                                {mon.speciesDef.name} · Stage {mon.stage}
+                              </p>
+                              <p className="font-mono text-[10px] font-bold text-[#fde047]">
+                                ⭐ {mon.xp} XP · 💧 {mon.drip} · 🔥 {mon.careStreak.count}d
+                              </p>
                             </div>
                           </div>
                         ) : (
-                          <div className="flex items-center justify-center gap-1.5 py-1">
+                          <div className="flex items-center justify-center gap-2 py-1">
                             {SPECIES_CATALOG.map((sp) => (
                               <StarterEgg key={sp.id} species={sp.id} size={46} wobble />
                             ))}
                           </div>
                         )}
 
-                        <div className="snes-window flex flex-col px-2 py-1.5">
+                        <div className="grid gap-1.5">
                           {(view.hatched
                             ? [
-                                `▶ CONTINUE (${mon.name.toUpperCase()})`,
-                                "🥚 NEW STARTER PET",
-                                "⚙️ SETTINGS",
+                                { lbl: `▶ Continue with ${mon.name}`, hi: true },
+                                { lbl: "🥚 Hatch New Starter", hi: false },
+                                { lbl: "⚙️ Settings", hi: false },
                               ]
-                            : ["🥚 CHOOSE STARTER PET", "⚙️ SETTINGS"]
-                          ).map((lbl, idx) => (
-                            <MenuRow
-                              key={lbl}
-                              selected={nav.title === idx}
-                              onClick={() => {
-                                patchNav({ title: idx });
-                                handleUiButton("o");
-                              }}
-                            >
-                              <span className="truncate">{lbl}</span>
-                            </MenuRow>
-                          ))}
+                            : [
+                                { lbl: "🥚 Choose Your Starter!", hi: true },
+                                { lbl: "⚙️ Settings", hi: false },
+                              ]
+                          ).map((row, idx) => {
+                            const sel = nav.title === idx;
+                            return (
+                              <button
+                                key={row.lbl}
+                                type="button"
+                                onClick={() => {
+                                  patchNav({ title: idx });
+                                  handleUiButton("o");
+                                }}
+                                className="flex items-center justify-between rounded-xl px-3 py-1.5 text-left text-xs font-bold transition-all border"
+                                style={{
+                                  background: sel
+                                    ? "linear-gradient(90deg, rgba(123,230,216,0.28), rgba(253,224,71,0.18))"
+                                    : "rgba(255,255,255,0.05)",
+                                  borderColor: sel ? "#7be6d8" : "rgba(255,255,255,0.12)",
+                                  color: sel ? "#ffffff" : "#cbd5e1",
+                                }}
+                              >
+                                <span className="truncate">{row.lbl}</span>
+                                {sel && <span className="font-mono text-[10px] text-[#fde047]">O</span>}
+                              </button>
+                            );
+                          })}
                         </div>
-                        <ScreenText className="text-center text-[13px] opacity-80">▲▼: MOVE · O: SELECT</ScreenText>
                       </div>
                     ) : mode === "hatch" ? (
-                      /* 5-STARTER SPECIES PICKER ON 280x240 LCD */
-                      <div className="snes-dots flex h-full flex-col gap-1.5 p-2.5" style={{ background: "linear-gradient(180deg,#23235e 0%,#10102e 100%)" }}>
-                        <Banner
-                          title={`STARTER ${(nav.hatchSpecies % SPECIES_CATALOG.length) + 1}/${SPECIES_CATALOG.length}`}
-                          right={<span className="font-pixel text-[14px]">◄ ►</span>}
-                        />
-                        <div className="snes-window grid flex-1 grid-cols-[120px_1fr] items-center gap-2 px-2.5 py-2">
-                          <div className="flex flex-col items-center gap-1">
-                            <div
-                              className="flex h-[106px] w-[106px] items-center justify-center rounded-xl border-2 border-[#0a0a24]"
-                              style={{ background: `radial-gradient(circle, #ffffff 0%, ${selectedStarter.eggColors[0]} 65%, ${selectedStarter.eggColors[1]} 100%)` }}
-                            >
-                              <div className="h-[88px] w-[88px] anim-bob">
-                                <Monster species={selectedStarter.id} stage={1} actualStage={1} mood="excited" equipped={[]} />
-                              </div>
-                            </div>
+                      /* 5-STARTER SPECIES PICKER ON 320x240 */
+                      <div
+                        className="flex h-full flex-col gap-2 p-2.5"
+                        style={{ background: "radial-gradient(circle at 50% 0%, #2b2266 0%, #110e2b 100%)" }}
+                      >
+                        <ScreenHeader
+                          title={`CHOOSE STARTER (${(nav.hatchSpecies % SPECIES_CATALOG.length) + 1}/5)`}
+                          onBack={() => setMode("title")}
+                          right={
                             <div className="flex gap-1">
                               {SPECIES_CATALOG.map((sp, i) => (
-                                <span
+                                <button
                                   key={sp.id}
-                                  className="h-2 w-2 rounded-full"
-                                  style={{ background: i === nav.hatchSpecies % SPECIES_CATALOG.length ? sp.accentColor : "rgba(255,255,255,0.25)" }}
+                                  type="button"
+                                  onClick={() => patchNav({ hatchSpecies: i })}
+                                  className="rounded-full border border-black/50 shrink-0"
+                                  style={{
+                                    width: "10px",
+                                    height: "10px",
+                                    minHeight: "10px",
+                                    background: i === nav.hatchSpecies % SPECIES_CATALOG.length ? sp.accentColor : "rgba(255,255,255,0.25)",
+                                  }}
+                                  aria-label={sp.name}
                                 />
                               ))}
+                            </div>
+                          }
+                        />
+                        <div className="grid flex-1 min-h-0 grid-cols-[126px_1fr] items-center gap-3 rounded-2xl border border-white/15 bg-white/5 p-2.5">
+                          <div className="flex flex-col items-center gap-1.5">
+                            <div
+                              className="flex h-[112px] w-[112px] items-center justify-center rounded-2xl border-2 border-black/30 shadow-inner"
+                              style={{ background: `radial-gradient(circle, #ffffff 0%, ${selectedStarter.eggColors[0]} 65%, ${selectedStarter.eggColors[1]} 100%)` }}
+                            >
+                              <div className="h-[94px] w-[94px] anim-bob">
+                                <Monster species={selectedStarter.id} stage={1} actualStage={1} mood="excited" equipped={[]} />
+                              </div>
                             </div>
                           </div>
                           <div className="min-w-0 space-y-1">
                             <p className="font-game truncate text-[11px]" style={{ color: selectedStarter.accentColor }}>
                               {selectedStarter.name.toUpperCase()}
                             </p>
-                            <p className="font-pixel text-[15px] text-white leading-none">
-                              NAME: {selectedStarter.defaultPetName.toUpperCase()}
+                            <p className="text-[11px] font-bold text-white">
+                              Default: {selectedStarter.defaultPetName} · <span className="text-[#fde047]">X: {selectedStarter.specialMove.name}</span>
                             </p>
-                            <p className="font-pixel text-[14px] text-[#ffd23f] leading-tight">
-                              X: {selectedStarter.specialMove.name.toUpperCase()}
+                            <p className="text-[10px] leading-snug text-emerald-300 font-semibold">
+                              ✦ {selectedStarter.perkSummary}
                             </p>
-                            <p className="font-pixel text-[13px] text-emerald-300 leading-tight">
-                              {selectedStarter.perkSummary}
-                            </p>
-                            <p className="font-pixel text-[13px] text-white/75 leading-none">
+                            <p className="font-mono text-[10px] text-white/80">
                               SPD {selectedStarter.statBars.speed} · STA {selectedStarter.statBars.stamina} · SPC {selectedStarter.statBars.spice} · LCK {selectedStarter.statBars.luck}
                             </p>
+                            <button
+                              type="button"
+                              onClick={() => handleUiButton("o")}
+                              className="mt-1 w-full rounded-xl py-1.5 font-game text-[9.5px] text-[#141026] shadow"
+                              style={{ background: `linear-gradient(90deg, ${selectedStarter.accentColor}, #fde047)` }}
+                            >
+                              🥚 HATCH {selectedStarter.defaultPetName.toUpperCase()} (O)
+                            </button>
                           </div>
                         </div>
-                        <ScreenText className="text-center text-[13px] opacity-85">◄►: SPECIES · O: HATCH! · X: BACK</ScreenText>
                       </div>
                     ) : mon.isSleeping && mode === "pet" ? (
                       <DreamScreensaver
@@ -1423,85 +1540,112 @@ export function App() {
                         }}
                       />
                     ) : mode === "menu" ? (
-                      <div className="snes-dots flex h-full flex-col gap-1.5 p-2.5" style={{ background: "linear-gradient(180deg,#23235e 0%,#10102e 100%)" }}>
-                        <Banner title="MAIN MENU" right={<span className="font-game text-[10px]">💧{mon.drip}</span>} />
-                        <div className="snes-window grid flex-1 grid-cols-2 gap-x-1 gap-y-0.5 px-1.5 py-1.5">
-                          {MENU.map((item, i) => (
-                            <MenuRow
-                              key={item.id}
-                              selected={i === nav.menu}
-                              onClick={() => {
-                                patchNav({ menu: i });
-                                handleUiButton("o");
-                              }}
-                            >
-                              <span className="text-[15px] leading-none">{item.glyph}</span>
-                              <span className="truncate text-[10px]">{item.label}</span>
-                            </MenuRow>
-                          ))}
+                      /* STYLISH 5x2 VISUAL APP LAUNCHER GRID (320x240) */
+                      <div
+                        className="flex h-full flex-col gap-2 p-2.5"
+                        style={{ background: "radial-gradient(circle at 50% 0%, #2a2263 0%, #110e29 100%)" }}
+                      >
+                        <ScreenHeader
+                          title="LAUNCHER"
+                          onBack={() => setMode("pet")}
+                          right={<span className="font-mono text-[10px] font-bold text-[#fde047]">💧 {mon.drip} Drip</span>}
+                        />
+                        <div className="grid flex-1 grid-cols-5 grid-rows-2 gap-1.5">
+                          {MENU.map((item, i) => {
+                            const sel = i === nav.menu;
+                            return (
+                              <button
+                                key={item.id}
+                                type="button"
+                                onClick={() => {
+                                  patchNav({ menu: i });
+                                  handleUiButton("o");
+                                }}
+                                className="flex flex-col items-center justify-center gap-1 rounded-xl border transition-all p-1"
+                                style={{
+                                  background: sel
+                                    ? `linear-gradient(180deg, ${item.tint}44 0%, rgba(18,14,44,0.92) 100%)`
+                                    : "rgba(255,255,255,0.05)",
+                                  borderColor: sel ? "#fde047" : "rgba(255,255,255,0.1)",
+                                  boxShadow: sel ? `0 0 12px ${item.tint}55` : undefined,
+                                }}
+                              >
+                                <span className="text-[20px] leading-none">{item.glyph}</span>
+                                <span
+                                  className="font-mono text-[9px] font-extrabold tracking-tight"
+                                  style={{ color: sel ? "#fde047" : "#e2e8f0" }}
+                                >
+                                  {item.label}
+                                </span>
+                              </button>
+                            );
+                          })}
                         </div>
-                        <ScreenText className="text-center text-[13px] opacity-80">D-PAD: MOVE · O: OPEN · X: BACK</ScreenText>
+                        <p className="text-center font-mono text-[9.5px] text-white/65">
+                          Tap any icon or use D-Pad + O · X returns to {mon.name}
+                        </p>
                       </div>
                     ) : mode === "feed" && currentMeme ? (
                       feedFullscreen ? (
-                        /* FULL-SCREEN 280x240 MEME FEED VIEW (toggled via ▲ Up Arrow) */
+                        /* FULL-SCREEN 320x240 (4:3) MEME FEED VIEW (toggled via ▲ Up Arrow) */
                         <div className="relative h-full w-full overflow-hidden bg-black">
                           {memeSrc ? (
-                            <img
-                              src={memeSrc}
-                              alt={currentMeme.caption}
-                              className="h-full w-full object-cover"
-                              draggable={false}
-                            />
+                            <img src={memeSrc} alt={currentMeme.caption} className="h-full w-full object-cover" draggable={false} />
                           ) : (
-                            <div
-                              className="flex h-full w-full items-center justify-center text-6xl"
-                              style={{ background: currentMeme.bg }}
-                            >
+                            <div className="flex h-full w-full items-center justify-center text-6xl" style={{ background: currentMeme.bg }}>
                               {currentMeme.emoji}
                             </div>
                           )}
 
-                          {/* Subtle top index & title badge */}
                           <div className="pointer-events-none absolute inset-x-2 top-1.5 flex items-center justify-between gap-2">
-                            <span
-                              className="max-w-[74%] truncate rounded-full px-2.5 py-0.5 font-mono text-[9.5px] font-bold text-white"
-                              style={{ background: "rgba(10, 10, 32, 0.78)" }}
-                            >
+                            <span className="max-w-[76%] truncate rounded-full px-2.5 py-0.5 font-mono text-[10px] font-bold text-white" style={{ background: "rgba(10, 10, 32, 0.78)" }}>
                               {currentMeme.title}
                             </span>
-                            <span
-                              className="shrink-0 rounded-full px-2 py-0.5 font-mono text-[9px] font-bold text-[#ffd23f]"
-                              style={{ background: "rgba(10, 10, 32, 0.78)" }}
-                            >
+                            <span className="shrink-0 rounded-full px-2 py-0.5 font-mono text-[9.5px] font-bold text-[#fde047]" style={{ background: "rgba(10, 10, 32, 0.78)" }}>
                               {(nav.meme % memeCount) + 1}/{view.memes.length}
                             </span>
                           </div>
 
-                          {/* Minimal bottom control bar so meme dominates screen */}
                           <div
-                            className="absolute inset-x-2 bottom-1.5 flex items-center justify-between gap-1.5 rounded-lg px-2 py-1"
-                            style={{ background: "rgba(10, 10, 32, 0.82)", border: "1px solid rgba(255,255,255,0.18)" }}
+                            className="absolute inset-x-2 bottom-1.5 flex items-center justify-between gap-1.5 rounded-xl px-2 py-1"
+                            style={{ background: "rgba(10, 10, 32, 0.84)", border: "1px solid rgba(255,255,255,0.2)" }}
                           >
-                            <span
-                              className="rounded px-1.5 py-0.5 font-game text-[8px] text-white"
+                            <button
+                              type="button"
+                              onClick={() => handleUiButton("down")}
+                              className="rounded-md px-2 py-0.5 font-mono text-[9.5px] font-extrabold text-white"
                               style={{ background: LABEL_COLOR[currentLabel] }}
                             >
                               {LABEL_FACE[currentLabel]}
+                            </button>
+                            <span className="font-mono text-[9px] font-bold text-white/85">
+                              ◄► MEME · ▼ VIBE · O FEED
                             </span>
-                            <span className="font-mono text-[8.5px] font-bold text-white/90">
-                              ◄► MEME · ▼ VIBE · O FEED · ▲ EXIT
-                            </span>
+                            <button
+                              type="button"
+                              onClick={() => setFeedFullscreen(false)}
+                              className="rounded-md bg-white/15 px-1.5 py-0.5 font-mono text-[9px] font-bold text-[#fde047]"
+                            >
+                              ▲ EXIT
+                            </button>
                           </div>
                         </div>
                       ) : (
-                        /* LANDSCAPE SPLIT FEED SCREEN */
-                        <div className="snes-dots flex h-full flex-col gap-1.5 p-2" style={{ background: "linear-gradient(180deg,#23235e 0%,#10102e 100%)" }}>
-                          <Banner
-                            title={`FEED ${(nav.meme % memeCount) + 1}/${view.memes.length}`}
-                            right={<span className="font-pixel text-[14px]">🫃 {view.belly.length}/{mon.memeSlots}</span>}
+                        /* STYLISH 320x240 4:3 SPLIT FEED SCREEN */
+                        <div
+                          className="flex h-full flex-col gap-2 p-2.5"
+                          style={{ background: "radial-gradient(circle at 50% 0%, #2a2263 0%, #110e29 100%)" }}
+                        >
+                          <ScreenHeader
+                            title={`MEME FEED ${(nav.meme % memeCount) + 1}/${view.memes.length}`}
+                            onBack={() => setMode("pet")}
+                            right={
+                              <span className="font-mono text-[10px] font-bold text-[#7be6d8]">
+                                🫃 Belly {view.belly.length}/{mon.memeSlots}
+                              </span>
+                            }
                           />
-                          <div className="grid flex-1 min-h-0 grid-cols-[46%_1fr] gap-2">
+                          <div className="grid flex-1 min-h-0 grid-cols-[52%_1fr] gap-2.5">
                             <button
                               type="button"
                               onClick={() => {
@@ -1509,334 +1653,489 @@ export function App() {
                                 setFeedFullscreen(true);
                               }}
                               title="Press ▲ Up Arrow for Full Screen Meme"
-                              className="relative overflow-hidden rounded-lg border-[3px] border-[#0a0a24] bg-black text-left"
+                              className="relative overflow-hidden rounded-2xl border-2 border-white/15 bg-black shadow-lg text-left"
                             >
                               {memeSrc ? (
-                                <img src={memeSrc} alt={currentMeme.caption} className="pixelated h-full w-full object-cover" draggable={false} />
+                                <img src={memeSrc} alt={currentMeme.caption} className="h-full w-full object-cover" draggable={false} />
                               ) : (
-                                <div className="flex h-full w-full items-center justify-center text-4xl" style={{ background: currentMeme.bg }}>
+                                <div className="flex h-full w-full items-center justify-center text-5xl" style={{ background: currentMeme.bg }}>
                                   {currentMeme.emoji}
                                 </div>
                               )}
                               <span
-                                className="absolute bottom-1 right-1 rounded px-1.5 py-0.5 font-mono text-[8px] font-bold text-[#ffd23f]"
+                                className="absolute bottom-1.5 right-1.5 rounded-full px-2 py-0.5 font-mono text-[9px] font-bold text-[#fde047] border border-white/20"
                                 style={{ background: "rgba(10, 10, 32, 0.85)" }}
                               >
-                                ▲ FULL
+                                ⤢ ▲ FULL
                               </span>
                             </button>
-                            <div className="snes-window flex flex-col justify-between p-2">
+
+                            <div className="flex flex-col justify-between rounded-2xl border border-white/12 bg-white/6 p-2.5">
                               <div>
-                                <p className="font-game line-clamp-2 text-[9.5px] leading-snug text-white">
-                                  {currentMeme.title.toUpperCase()}
+                                <p className="line-clamp-2 text-[11px] font-extrabold leading-tight text-white">
+                                  {currentMeme.title}
                                 </p>
-                                <p className="font-pixel mt-1 text-[15px] text-[#ffd23f]">
-                                  PWR {currentMeme.power} · ♥{currentMeme.tasty} 🌶{currentMeme.spicy} 🤢{currentMeme.blech}
+                                <p className="mt-1 font-mono text-[10px] font-bold text-[#fde047]">
+                                  PWR {currentMeme.power} · 😋{currentMeme.tasty} 🌶️{currentMeme.spicy} 🤢{currentMeme.blech}
                                 </p>
                               </div>
-                              <div className="text-center">
-                                <div className="flex items-center justify-center gap-1.5">
-                                  <span className="text-[#ffd23f]">◀</span>
-                                  <span
-                                    className="font-game border-2 border-[#0a0a24] px-2 py-1 text-[9.5px] text-white"
-                                    style={{ background: LABEL_COLOR[currentLabel] }}
-                                  >
-                                    {LABEL_FACE[currentLabel]}
-                                  </span>
-                                  <span className="text-[#ffd23f]">▶</span>
+
+                              <div className="space-y-1.5">
+                                <div className="grid grid-cols-3 gap-1">
+                                  {LABELS.map((lb, idx) => {
+                                    const active = idx === nav.label % LABELS.length;
+                                    return (
+                                      <button
+                                        key={lb}
+                                        type="button"
+                                        onClick={() => patchNav({ label: idx })}
+                                        className="rounded-lg py-1 font-mono text-[8.5px] font-extrabold uppercase border transition-all"
+                                        style={{
+                                          background: active ? LABEL_COLOR[lb] : "rgba(255,255,255,0.07)",
+                                          borderColor: active ? "#ffffff" : "rgba(255,255,255,0.12)",
+                                          color: "#ffffff",
+                                        }}
+                                      >
+                                        {lb}
+                                      </button>
+                                    );
+                                  })}
                                 </div>
-                                <p className="font-pixel mt-1 text-[12px] text-[#7be6d8]">
-                                  ▲ FULLSCREEN · ▼ NEXT
-                                </p>
-                                <p className="font-pixel text-[12px] text-white/85">
-                                  ◄► LABEL · O FEED
-                                </p>
+                                <div className="flex gap-1.5">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleUiButton("o")}
+                                    className="flex-1 rounded-xl bg-gradient-to-r from-[#7be6d8] to-[#2dd4bf] py-1.5 font-mono text-[10px] font-black text-[#141026] shadow"
+                                  >
+                                    🍽️ FEED (O)
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleUiButton("down")}
+                                    className="rounded-xl border border-white/15 bg-white/10 px-2.5 py-1.5 font-mono text-[10px] font-bold text-white"
+                                    title="Next meme (▼)"
+                                  >
+                                    ▼
+                                  </button>
+                                </div>
                               </div>
                             </div>
                           </div>
                         </div>
                       )
                     ) : mode === "care" ? (
-                      <div className="snes-dots flex h-full flex-col gap-1.5 p-2.5" style={{ background: "linear-gradient(180deg,#23235e 0%,#10102e 100%)" }}>
-                        <Banner title="CARE" />
-                        <div className="snes-window flex flex-1 flex-col px-2 py-2">
-                          <div className="flex flex-1 flex-col justify-center">
-                            {CARE.map((item, i) => {
-                              const rawCd = item.id === "feed" ? mon.cooldowns.feedSec : item.id === "groom" ? mon.cooldowns.groomSec : item.id === "play" ? mon.cooldowns.playSec : 0;
-                              const cd = Math.max(0, rawCd - elapsedServerSec);
-                              return (
-                                <MenuRow key={item.id} selected={i === nav.care}>
-                                  <span className="text-[17px] leading-none">{item.glyph}</span>
-                                  <span className="flex-1">{item.label}</span>
-                                  {cd > 0 && <span className="font-pixel text-[16px] text-[#ffd23f]">{cd}s</span>}
-                                </MenuRow>
-                              );
-                            })}
-                          </div>
-                          <ScreenText className="text-center text-[13px] opacity-80">▲▼: PICK · O: DO IT · X: MENU</ScreenText>
+                      <div
+                        className="flex h-full flex-col gap-2 p-2.5"
+                        style={{ background: "radial-gradient(circle at 50% 0%, #2a2263 0%, #110e29 100%)" }}
+                      >
+                        <ScreenHeader title="CARE STATION" onBack={() => setMode("pet")} />
+                        <div className="grid flex-1 grid-cols-2 grid-rows-2 gap-2">
+                          {CARE.map((item, i) => {
+                            const rawCd = item.id === "feed" ? mon.cooldowns.feedSec : item.id === "groom" ? mon.cooldowns.groomSec : item.id === "play" ? mon.cooldowns.playSec : 0;
+                            const cd = Math.max(0, rawCd - elapsedServerSec);
+                            const sel = i === nav.care;
+                            return (
+                              <button
+                                key={item.id}
+                                type="button"
+                                onClick={() => {
+                                  patchNav({ care: i });
+                                  handleUiButton("o");
+                                }}
+                                className="flex flex-col items-start justify-between rounded-2xl border p-2.5 text-left transition-all"
+                                style={{
+                                  background: sel ? `${item.color}28` : "rgba(255,255,255,0.05)",
+                                  borderColor: sel ? "#fde047" : "rgba(255,255,255,0.12)",
+                                }}
+                              >
+                                <div className="flex w-full items-center justify-between">
+                                  <span className="text-xl leading-none">{item.glyph}</span>
+                                  {cd > 0 && (
+                                    <span className="rounded-full bg-black/50 px-1.5 py-0.5 font-mono text-[9.5px] font-bold text-[#fde047]">
+                                      {cd}s
+                                    </span>
+                                  )}
+                                </div>
+                                <div>
+                                  <p className="font-game text-[10px] text-white">{item.label}</p>
+                                  <p className="text-[10px] text-white/70">{item.desc}</p>
+                                </div>
+                              </button>
+                            );
+                          })}
                         </div>
                       </div>
                     ) : mode === "games" ? (
-                      /* SNES 280x240 ARCADE CARTRIDGE LAUNCHER */
-                      <div className="snes-dots flex h-full flex-col gap-1.5 p-2.5" style={{ background: "linear-gradient(180deg,#23235e 0%,#10102e 100%)" }}>
-                        <Banner
+                      /* SNES 320x240 ARCADE CARTRIDGE LAUNCHER */
+                      <div
+                        className="flex h-full flex-col gap-2 p-2.5"
+                        style={{ background: "radial-gradient(circle at 50% 0%, #2d1e6b 0%, #100c28 100%)" }}
+                      >
+                        <ScreenHeader
                           title="SNES ARCADE"
+                          onBack={() => setMode("pet")}
                           right={
-                            <span className="font-pixel text-[13px]">
+                            <span className="font-mono text-[9.5px] font-bold text-[#fde047] whitespace-nowrap shrink-0">
                               {mon.milestonePowers.turboCharge ? "⚡" : ""}
                               {mon.milestonePowers.secondWind ? "🛡️" : ""}
                               {mon.milestonePowers.memeOverdrive ? "🔥" : ""}
-                              X:{mon.speciesDef.specialMove.name.toUpperCase()}
+                              {" "}X: {mon.speciesDef.specialMove.name}
                             </span>
                           }
                         />
-                        <div className="snes-window flex flex-1 flex-col justify-between px-2 py-2">
-                          <div className="flex flex-1 flex-col justify-center gap-1.5">
-                            {MINI_GAMES_CATALOG.map((g, i) => {
-                              const sel = i === nav.games;
-                              const hs = mon.highScores[g.id];
-                              return (
-                                <div
-                                  key={g.id}
-                                  onClick={() => {
-                                    const wasSel = navRef.current.games === i;
-                                    patchNav({ games: i });
-                                    if (wasSel) handleUiButton("o");
-                                  }}
-                                  className="flex cursor-pointer items-center gap-2 border-2 px-2 py-1.5"
-                                  style={{
-                                    borderColor: sel ? "#ffd23f" : "rgba(255,255,255,0.25)",
-                                    background: sel ? "rgba(255,210,63,0.16)" : "rgba(255,255,255,0.04)",
-                                  }}
-                                >
-                                  <span className="w-[16px] shrink-0">{sel ? <Cursor /> : null}</span>
-                                  <span className="text-[19px] leading-none">{g.glyph}</span>
-                                  <div className="min-w-0 flex-1">
-                                    <div className="flex items-center justify-between gap-1">
-                                      <span className={`font-game text-[10px] ${sel ? "text-[#ffd23f]" : "text-white"}`}>{g.shortName}</span>
-                                      <span className="font-pixel text-[14px] text-[#7be6d8]">BEST {hs.bestScore}</span>
-                                    </div>
-                                    <p className="font-pixel truncate text-[13px] text-white/75">{g.genre}</p>
+                        <div className="flex flex-1 flex-col justify-center gap-1.5">
+                          {MINI_GAMES_CATALOG.map((g, i) => {
+                            const sel = i === nav.games;
+                            const hs = mon.highScores[g.id];
+                            return (
+                              <button
+                                key={g.id}
+                                type="button"
+                                onClick={() => {
+                                  patchNav({ games: i });
+                                  launchGame(g.id);
+                                }}
+                                className="flex items-center gap-2.5 rounded-2xl border px-3 py-2 text-left transition-all"
+                                style={{
+                                  borderColor: sel ? "#fde047" : "rgba(255,255,255,0.14)",
+                                  background: sel
+                                    ? "linear-gradient(90deg, rgba(123,230,216,0.22), rgba(253,224,71,0.14))"
+                                    : "rgba(255,255,255,0.05)",
+                                }}
+                              >
+                                <span className="text-2xl leading-none">{g.glyph}</span>
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-center justify-between gap-2">
+                                    <span className={`font-game text-[10px] ${sel ? "text-[#fde047]" : "text-white"}`}>{g.name.toUpperCase()}</span>
+                                    <span className="rounded-full bg-black/40 px-2 py-0.5 font-mono text-[9.5px] font-bold text-[#7be6d8]">
+                                      BEST {hs.bestScore}
+                                    </span>
                                   </div>
+                                  <p className="truncate text-[10px] text-white/75 mt-0.5">{g.genre} · Max ×{hs.bestCombo}</p>
                                 </div>
-                              );
-                            })}
-                          </div>
-                          <ScreenText className="text-center text-[13px] opacity-80">▲▼: GAME · O: START · X: MENU</ScreenText>
+                              </button>
+                            );
+                          })}
                         </div>
                       </div>
                     ) : mode === "shop" ? (
-                      <div className="snes-dots flex h-full flex-col gap-1.5 p-2.5" style={{ background: "linear-gradient(180deg,#23235e 0%,#10102e 100%)" }}>
-                        <Banner title="DRIP SHOP" right={<span className="font-game text-[10px]">💧{mon.drip}</span>} />
-                        <div className="snes-window flex flex-1 flex-col px-2 py-1.5">
-                          <div className="flex flex-1 flex-col justify-center">
-                            {view.cosmetics
-                              .slice(windowStart(nav.shop, view.cosmetics.length, 5), windowStart(nav.shop, view.cosmetics.length, 5) + 5)
-                              .map((c) => {
-                                const i = view.cosmetics.indexOf(c);
-                                return (
-                                  <MenuRow key={c.id} selected={i === nav.shop}>
-                                    <span className="inline-flex h-[20px] w-[20px] shrink-0 items-center justify-center rounded bg-white/90 p-[1px]">
-                                      <CosmeticBadge assetId={c.id} size={18} />
-                                    </span>
-                                    <span className="min-w-0 flex-1 truncate text-[10px]">{c.name.toUpperCase()}</span>
-                                    <span className="font-pixel shrink-0 text-[15px] text-[#ffd23f]">
-                                      {c.equipped ? "★ ON" : c.owned ? "OWNED" : `💧${c.price}`}
-                                    </span>
-                                  </MenuRow>
-                                );
-                              })}
-                          </div>
-                          <ScreenText className="text-center text-[13px] opacity-80">▲▼: ITEM · O: BUY · X: MENU</ScreenText>
+                      <div
+                        className="flex h-full flex-col gap-2 p-2.5"
+                        style={{ background: "radial-gradient(circle at 50% 0%, #2a2263 0%, #110e29 100%)" }}
+                      >
+                        <ScreenHeader
+                          title="DRIP BOUTIQUE"
+                          onBack={() => setMode("menu")}
+                          right={<span className="font-mono text-[10px] font-bold text-[#fde047]">💧 {mon.drip}</span>}
+                        />
+                        <div className="flex flex-1 flex-col gap-1 overflow-hidden">
+                          {view.cosmetics
+                            .slice(windowStart(nav.shop, view.cosmetics.length, 5), windowStart(nav.shop, view.cosmetics.length, 5) + 5)
+                            .map((c) => {
+                              const i = view.cosmetics.indexOf(c);
+                              const sel = i === nav.shop;
+                              return (
+                                <button
+                                  key={c.id}
+                                  type="button"
+                                  onClick={() => {
+                                    patchNav({ shop: i });
+                                    buyMut.mutate(c.id);
+                                  }}
+                                  className="flex flex-1 items-center gap-2 rounded-xl border px-2 py-1 text-left"
+                                  style={{
+                                    borderColor: sel ? "#fde047" : "rgba(255,255,255,0.08)",
+                                    background: sel ? "rgba(253,224,71,0.14)" : "rgba(255,255,255,0.04)",
+                                  }}
+                                >
+                                  <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-white/95 p-0.5">
+                                    <CosmeticBadge assetId={c.id} size={20} />
+                                  </span>
+                                  <span className="min-w-0 flex-1 truncate text-[11px] font-bold text-white">{c.name}</span>
+                                  <span className="font-mono text-[10px] font-extrabold text-[#fde047]">
+                                    {c.equipped ? "★ ON" : c.owned ? "OWNED" : `💧${c.price}`}
+                                  </span>
+                                </button>
+                              );
+                            })}
                         </div>
                       </div>
                     ) : mode === "bag" ? (
-                      <div className="snes-dots flex h-full flex-col gap-1.5 p-2.5" style={{ background: "linear-gradient(180deg,#23235e 0%,#10102e 100%)" }}>
-                        <Banner title="WARDROBE BAG" />
-                        <div className="snes-window flex flex-1 flex-col px-2 py-1.5">
-                          {ownedItems.length === 0 ? (
-                            <div className="flex flex-1 flex-col items-center justify-center text-center">
-                              <p className="font-game text-[11px] text-white">BAG'S EMPTY.</p>
-                              <ScreenText className="mt-1 text-[15px] opacity-75">BUY DRIP IN THE SHOP.</ScreenText>
-                            </div>
-                          ) : (
-                            <div className="flex flex-1 flex-col justify-center">
-                              {ownedItems
-                                .slice(windowStart(nav.bag, ownedItems.length, 5), windowStart(nav.bag, ownedItems.length, 5) + 5)
-                                .map((c) => {
-                                  const i = ownedItems.indexOf(c);
-                                  return (
-                                    <MenuRow key={c.id} selected={i === nav.bag}>
-                                      <span className="inline-flex h-[20px] w-[20px] shrink-0 items-center justify-center rounded bg-white/90 p-[1px]">
-                                        <CosmeticBadge assetId={c.id} size={18} />
-                                      </span>
-                                      <span className="min-w-0 flex-1 truncate text-[10px]">{c.name.toUpperCase()}</span>
-                                      <span className="font-pixel shrink-0 text-[15px] text-[#ffd23f]">{c.equipped ? "★ WORN" : c.slot.toUpperCase()}</span>
-                                    </MenuRow>
-                                  );
-                                })}
-                            </div>
-                          )}
-                          <ScreenText className="text-center text-[13px] opacity-80">▲▼: ITEM · O: WEAR/OFF · X: MENU</ScreenText>
-                        </div>
+                      <div
+                        className="flex h-full flex-col gap-2 p-2.5"
+                        style={{ background: "radial-gradient(circle at 50% 0%, #2a2263 0%, #110e29 100%)" }}
+                      >
+                        <ScreenHeader title="WARDROBE BAG" onBack={() => setMode("menu")} />
+                        {ownedItems.length === 0 ? (
+                          <div className="flex flex-1 flex-col items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-center p-4">
+                            <p className="font-game text-[11px] text-white">WARDROBE EMPTY</p>
+                            <p className="mt-1 text-xs text-white/70">Visit Drip Boutique to unlock hats &amp; shades!</p>
+                          </div>
+                        ) : (
+                          <div className="flex flex-1 flex-col gap-1">
+                            {ownedItems
+                              .slice(windowStart(nav.bag, ownedItems.length, 5), windowStart(nav.bag, ownedItems.length, 5) + 5)
+                              .map((c) => {
+                                const i = ownedItems.indexOf(c);
+                                const sel = i === nav.bag;
+                                return (
+                                  <button
+                                    key={c.id}
+                                    type="button"
+                                    onClick={() => {
+                                      patchNav({ bag: i });
+                                      equipMut.mutate(c.id);
+                                    }}
+                                    className="flex flex-1 items-center gap-2 rounded-xl border px-2 py-1 text-left"
+                                    style={{
+                                      borderColor: sel ? "#7be6d8" : "rgba(255,255,255,0.08)",
+                                      background: sel ? "rgba(123,230,216,0.16)" : "rgba(255,255,255,0.04)",
+                                    }}
+                                  >
+                                    <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-white/95 p-0.5">
+                                      <CosmeticBadge assetId={c.id} size={20} />
+                                    </span>
+                                    <span className="min-w-0 flex-1 truncate text-[11px] font-bold text-white">{c.name}</span>
+                                    <span className="font-mono text-[10px] font-extrabold text-[#7be6d8]">
+                                      {c.equipped ? "★ WORN" : c.slot.toUpperCase()}
+                                    </span>
+                                  </button>
+                                );
+                              })}
+                          </div>
+                        )}
                       </div>
                     ) : mode === "stats" ? (
-                      <div className="snes-dots flex h-full flex-col gap-1.5 p-2.5" style={{ background: "linear-gradient(180deg,#23235e 0%,#10102e 100%)" }}>
+                      <div
+                        className="flex h-full flex-col gap-2 p-2.5"
+                        style={{ background: "radial-gradient(circle at 50% 0%, #2a2263 0%, #110e29 100%)" }}
+                      >
+                        <ScreenHeader
+                          title="STATUS"
+                          onBack={() => setMode("pet")}
+                          right={
+                            <div className="flex gap-1">
+                              {["Vitals", "Evo", "Arcade"].map((tabName, idx) => (
+                                <button
+                                  key={tabName}
+                                  type="button"
+                                  onClick={() => patchNav({ statsPage: idx })}
+                                  className="rounded-md px-1.5 py-0.5 font-mono text-[9px] font-bold"
+                                  style={{
+                                    background: nav.statsPage === idx ? "#fde047" : "rgba(255,255,255,0.12)",
+                                    color: nav.statsPage === idx ? "#141026" : "#ffffff",
+                                  }}
+                                >
+                                  {tabName}
+                                </button>
+                              ))}
+                            </div>
+                          }
+                        />
                         {nav.statsPage === 0 ? (
-                          <>
-                            <Banner title="VITALS · 1/3" right={<span className="font-pixel text-[14px]">🔥{mon.careStreak.count}D STREAK</span>} />
-                            <div className="snes-window flex flex-1 flex-col justify-between px-3 py-2">
-                              <div className="flex flex-1 flex-col justify-center gap-2">
-                                <StatRow label="FULLNESS" glyph="🍖" value={mon.fullness} cap={mon.statCap} />
-                                <StatRow label="HAPPY" glyph="♥️" value={mon.happiness} cap={mon.statCap} />
-                                <StatRow label="HYGIENE" glyph="🛁" value={mon.hygiene} cap={mon.statCap} />
-                                <StatRow label="ENERGY" glyph="⚡" value={mon.energy} cap={mon.statCap} />
-                                <StatRow label="HEAT" glyph="🌶" value={mon.heat} cap={mon.heatCap} heat />
-                              </div>
-                              <ScreenText className="text-center text-[14px] text-[#7be6d8]">
-                                {mon.speciesDef.name.toUpperCase()} · 💧{mon.drip} DRIP · ◄► PAGE
-                              </ScreenText>
+                          <div className="flex flex-1 flex-col justify-between rounded-2xl border border-white/12 bg-white/5 p-3">
+                            <div className="space-y-2">
+                              <StatRow label="FULLNESS" glyph="🍖" value={mon.fullness} cap={mon.statCap} />
+                              <StatRow label="HAPPY" glyph="♥️" value={mon.happiness} cap={mon.statCap} />
+                              <StatRow label="HYGIENE" glyph="🛁" value={mon.hygiene} cap={mon.statCap} />
+                              <StatRow label="ENERGY" glyph="⚡" value={mon.energy} cap={mon.statCap} />
+                              <StatRow label="HEAT" glyph="🌶" value={mon.heat} cap={mon.heatCap} heat />
                             </div>
-                          </>
+                            <p className="text-center font-mono text-[10px] font-bold text-[#7be6d8]">
+                              {mon.speciesDef.name} · 🔥 {mon.careStreak.count}d Streak · 💧 {mon.drip} Drip
+                            </p>
+                          </div>
                         ) : nav.statsPage === 1 ? (
-                          <>
-                            <Banner title="PROGRESS · 2/3" />
-                            <div className="snes-window flex flex-1 flex-col justify-between px-2.5 py-2">
-                              <div className="flex gap-1">
-                                {STAGES.map((st, i) => {
-                                  const reached = st.stage <= mon.stage;
-                                  const current = st.stage === mon.stage;
-                                  return (
-                                    <div
-                                      key={st.stage}
-                                      className="flex-1 border-2 border-[#0a0a24] px-[2px] py-[3px] text-center"
-                                      style={{
-                                        background: reached ? STAGE_COLORS[i] : "rgba(255,255,255,0.08)",
-                                        boxShadow: current ? "0 0 0 2px #ffd23f" : undefined,
-                                        opacity: reached ? 1 : 0.55,
-                                      }}
-                                    >
-                                      <span className="font-game block text-[7.5px]" style={{ color: reached ? "#10102e" : "#ffffff" }}>
-                                        {st.stage} {st.shortName}
-                                      </span>
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                              <div className="space-y-1">
-                                <ScreenText className="text-[16px]">
-                                  XP {mon.xp}{mon.nextStageXp ? ` / ${mon.nextStageXp}` : " · MAX!"} · DIGESTED {mon.digestedCount}
-                                </ScreenText>
-                                <ScreenText className="text-[14px] text-[#ffd23f]">
-                                  MILESTONES: {mon.milestonePowers.turboCharge ? "⚡TURBO ON" : `⚡${mon.digestedCount}/5`} · {mon.milestonePowers.secondWind ? "🛡️2ND ON" : `🛡️${mon.digestedCount}/15`} · {mon.milestonePowers.memeOverdrive ? "🔥×1.5 ON" : `🔥${mon.digestedCount}/30`}
-                                </ScreenText>
-                                <ScreenText className="text-[14px] opacity-85">
-                                  SECRETS {view.secrets.length}/10 · BEST STREAK {mon.careStreak.bestStreak}D
-                                </ScreenText>
-                              </div>
-                              <ScreenText className="text-center text-[13px] opacity-80">◄►: PAGE 2/3 · X: MENU</ScreenText>
+                          <div className="flex flex-1 flex-col justify-between rounded-2xl border border-white/12 bg-white/5 p-3">
+                            <div className="grid grid-cols-5 gap-1">
+                              {STAGES.map((st, i) => {
+                                const reached = st.stage <= mon.stage;
+                                const current = st.stage === mon.stage;
+                                return (
+                                  <div
+                                    key={st.stage}
+                                    className="rounded-lg border px-1 py-1.5 text-center"
+                                    style={{
+                                      background: reached ? STAGE_COLORS[i] : "rgba(255,255,255,0.06)",
+                                      borderColor: current ? "#ffffff" : "rgba(0,0,0,0.4)",
+                                      opacity: reached ? 1 : 0.55,
+                                    }}
+                                  >
+                                    <span className="font-mono block text-[9px] font-black" style={{ color: reached ? "#141026" : "#ffffff" }}>
+                                      S{st.stage} {st.shortName}
+                                    </span>
+                                  </div>
+                                );
+                              })}
                             </div>
-                          </>
+                            <div className="space-y-1 font-mono text-[10.5px]">
+                              <p className="font-bold text-white">
+                                XP {mon.xp.toLocaleString()}{mon.nextStageXp ? ` / ${mon.nextStageXp.toLocaleString()}` : " · MAX!"} · Digested {mon.digestedCount}
+                              </p>
+                              <p className="font-bold text-[#fde047]">
+                                {mon.milestonePowers.turboCharge ? "⚡Turbo ON" : `⚡${mon.digestedCount}/5`} · {mon.milestonePowers.secondWind ? "🛡️2ndWind ON" : `🛡️${mon.digestedCount}/15`} · {mon.milestonePowers.memeOverdrive ? "🔥×1.5 ON" : `🔥${mon.digestedCount}/30`}
+                              </p>
+                              <p className="text-white/75">
+                                Secrets {view.secrets.length}/10 · Best Streak {mon.careStreak.bestStreak}d
+                              </p>
+                            </div>
+                          </div>
                         ) : (
-                          <>
-                            <Banner title="ARCADE BESTS · 3/3" />
-                            <div className="snes-window flex flex-1 flex-col justify-between px-2.5 py-2">
-                              <div className="space-y-1.5">
-                                {MINI_GAMES_CATALOG.map((g) => {
-                                  const hs = mon.highScores[g.id];
-                                  return (
-                                    <div key={g.id} className="flex items-center justify-between border-b border-white/15 pb-1">
-                                      <span className="font-game text-[9.5px] text-white">
-                                        {g.glyph} {g.shortName}
-                                      </span>
-                                      <span className="font-pixel text-[15px] text-[#ffd23f]">
-                                        BEST {hs.bestScore} · ×{hs.bestCombo} · {hs.plays}P
-                                      </span>
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                              <ScreenText className="text-center text-[13px] opacity-80">◄►: PAGE 3/3 · X: MENU</ScreenText>
+                          <div className="flex flex-1 flex-col justify-between rounded-2xl border border-white/12 bg-white/5 p-3">
+                            <div className="space-y-2">
+                              {MINI_GAMES_CATALOG.map((g) => {
+                                const hs = mon.highScores[g.id];
+                                return (
+                                  <div key={g.id} className="flex items-center justify-between rounded-xl bg-black/25 px-2.5 py-1.5">
+                                    <span className="text-xs font-bold text-white">
+                                      {g.glyph} {g.name}
+                                    </span>
+                                    <span className="font-mono text-[10.5px] font-bold text-[#fde047]">
+                                      BEST {hs.bestScore} · ×{hs.bestCombo} · {hs.plays}P
+                                    </span>
+                                  </div>
+                                );
+                              })}
                             </div>
-                          </>
+                            <p className="text-center font-mono text-[10px] text-[#7be6d8]">
+                              Signature X Move: {mon.speciesDef.specialMove.name}
+                            </p>
+                          </div>
                         )}
                       </div>
                     ) : mode === "post" ? (
-                      <div className="snes-dots flex h-full flex-col gap-1.5 p-2.5" style={{ background: "linear-gradient(180deg,#23235e 0%,#10102e 100%)" }}>
-                        <Banner title="POST BONUS" />
-                        <div className="snes-window flex flex-1 flex-col px-2 py-1.5">
-                          <ScreenText className="text-center text-[14px] opacity-85">PASTE URL IN VOICE DOCK, OR ADD:</ScreenText>
-                          <div className="flex flex-1 flex-col justify-center">
-                            {view.bonusMemes.map((b, i) => {
-                              const sel = i === nav.post;
-                              return (
-                                <div key={b.key} className="flex min-h-[38px] items-center gap-1.5 px-1" style={{ background: sel ? "rgba(255,210,63,0.16)" : "transparent" }}>
-                                  <span className="w-[16px] shrink-0">{sel ? <Cursor /> : null}</span>
-                                  <img src={MEME_IMG[b.imageKey] ?? ""} alt="" className="pixelated h-[28px] w-[28px] shrink-0 border-2 border-[#0a0a24] object-cover" draggable={false} />
-                                  <span className={`font-game min-w-0 flex-1 truncate text-[9.5px] ${sel ? "text-[#ffd23f]" : "text-white"}`}>{b.title.toUpperCase()}</span>
-                                  <span className="font-pixel shrink-0 text-[14px] text-[#ffd23f]">{b.added ? "✓ ADDED" : "ADD"}</span>
-                                </div>
-                              );
-                            })}
-                          </div>
-                          <ScreenText className="text-center text-[13px] opacity-80">▲▼: PICK · O: ADD · X: MENU</ScreenText>
+                      <div
+                        className="flex h-full flex-col gap-2 p-2.5"
+                        style={{ background: "radial-gradient(circle at 50% 0%, #2a2263 0%, #110e29 100%)" }}
+                      >
+                        <ScreenHeader title="BONUS MEMES" onBack={() => setMode("menu")} />
+                        <div className="flex flex-1 flex-col gap-1.5">
+                          {view.bonusMemes.map((b, i) => {
+                            const sel = i === nav.post;
+                            return (
+                              <button
+                                key={b.key}
+                                type="button"
+                                onClick={() => {
+                                  patchNav({ post: i });
+                                  bonusMut.mutate(b.key);
+                                }}
+                                className="flex flex-1 items-center gap-2 rounded-xl border px-2 py-1 text-left"
+                                style={{
+                                  borderColor: sel ? "#fde047" : "rgba(255,255,255,0.1)",
+                                  background: sel ? "rgba(253,224,71,0.14)" : "rgba(255,255,255,0.05)",
+                                }}
+                              >
+                                <img src={MEME_IMG[b.imageKey] ?? ""} alt="" className="h-8 w-8 shrink-0 rounded-lg border border-black/40 object-cover" draggable={false} />
+                                <span className="min-w-0 flex-1 truncate text-xs font-bold text-white">{b.title}</span>
+                                <span className="font-mono text-[10px] font-extrabold text-[#7be6d8]">{b.added ? "✓ IN PACK" : "+ ADD"}</span>
+                              </button>
+                            );
+                          })}
                         </div>
                       </div>
                     ) : mode === "settings" ? (
-                      <div className="snes-dots flex h-full flex-col gap-1.5 p-2.5" style={{ background: "linear-gradient(180deg,#23235e 0%,#10102e 100%)" }}>
-                        <Banner title="SETTINGS" />
-                        <div className="snes-window flex flex-1 flex-col px-2 py-1.5">
-                          <div className="flex flex-1 flex-col justify-center">
-                            {settingsRows.map((label, i) => (
-                              <MenuRow key={label} selected={i === nav.settings}>
-                                <span className="text-[10px]" style={i === 3 && resetArm ? { color: "#ff6b6b" } : undefined}>{label}</span>
-                              </MenuRow>
-                            ))}
-                          </div>
-                          <ScreenText className="text-center text-[13px] opacity-80">▲▼: PICK · O: CHANGE · X: BACK</ScreenText>
+                      <div
+                        className="flex h-full flex-col gap-2 p-2.5"
+                        style={{ background: "radial-gradient(circle at 50% 0%, #2a2263 0%, #110e29 100%)" }}
+                      >
+                        <ScreenHeader title="SETTINGS" onBack={() => setMode(view.hatched ? "menu" : "title")} />
+                        <div className="flex flex-1 flex-col gap-1.5">
+                          {settingsRows.map((label, i) => {
+                            const sel = i === nav.settings;
+                            return (
+                              <button
+                                key={label}
+                                type="button"
+                                onClick={() => {
+                                  patchNav({ settings: i });
+                                  handleUiButton("o");
+                                }}
+                                className="flex flex-1 items-center justify-between rounded-xl border px-3 py-1.5 text-left font-mono text-[10.5px] font-bold"
+                                style={{
+                                  borderColor: sel ? "#fde047" : "rgba(255,255,255,0.1)",
+                                  background: sel ? "rgba(253,224,71,0.16)" : "rgba(255,255,255,0.05)",
+                                  color: i === 3 && resetArm ? "#fb7185" : sel ? "#fde047" : "#ffffff",
+                                }}
+                              >
+                                <span>{label}</span>
+                                {sel && <span>O</span>}
+                              </button>
+                            );
+                          })}
                         </div>
                       </div>
                     ) : (
-                      /* LANDSCAPE 280x240 PET HOME SCREEN */
-                      <div className="relative flex h-full flex-col px-2 pb-1.5 pt-1.5">
+                      /* STYLISH 320x240 (4:3) PET HABITAT HOME SCREEN */
+                      <div className="relative flex h-full flex-col px-2.5 pb-2 pt-2">
                         <SceneBg tod={tod} />
+
+                        {/* Floating Glass Top Status Bar */}
                         <div className="relative flex items-center justify-between gap-1.5">
-                          <span className="snes-bar font-game max-w-[54%] truncate px-2 py-[4px] text-[9.5px] leading-none text-white">
-                            {mon.name.toUpperCase()}
-                          </span>
-                          <span className="snes-bar font-pixel shrink-0 px-2 py-[3px] text-[14px] leading-none text-[#ffd23f]">
-                            STG {mon.stage} · 🔥{mon.careStreak.count}D
-                          </span>
+                          <div
+                            className="flex items-center gap-1.5 rounded-full px-2.5 py-1 border border-white/20 shadow-sm max-w-[60%]"
+                            style={{ background: "rgba(15, 12, 36, 0.78)" }}
+                          >
+                            <span className="h-2 w-2 rounded-full shrink-0" style={{ background: mon.speciesDef.accentColor }} />
+                            <span className="font-game truncate text-[9.5px] text-white">{mon.name.toUpperCase()}</span>
+                            <span className="font-mono text-[9px] font-bold text-white/70 shrink-0">S{mon.stage}</span>
+                          </div>
+                          <div
+                            className="flex items-center gap-2 rounded-full px-2.5 py-1 border border-white/20 font-mono text-[10px] font-bold shadow-sm"
+                            style={{ background: "rgba(15, 12, 36, 0.78)" }}
+                          >
+                            <span className="text-[#fde047]">💧{mon.drip}</span>
+                            <span className="text-orange-300">🔥{mon.careStreak.count}d</span>
+                          </div>
                         </div>
 
                         {mon.speech && (
-                          <div className="absolute left-2.5 top-[38px] z-10 max-w-[68%] border-2 border-[#0a0a24] bg-white px-2 py-[3px]">
-                            <p className="font-pixel text-[15px] leading-none text-[#191930]">“{mon.speech}”</p>
+                          <div className="absolute left-3 top-[42px] z-10 max-w-[62%] rounded-2xl rounded-bl-sm border-2 border-[#1b1d36] bg-white/95 px-2.5 py-1 shadow-md">
+                            <p className="text-[11px] font-bold leading-tight text-[#1b1d36]">“{mon.speech}”</p>
                           </div>
                         )}
 
-                        <div className="relative flex min-h-0 flex-1 items-center justify-center">
-                          <div className={`aspect-square h-[108%] max-h-[175px] ${animClass}`}>
+                        {/* Monster Stage with Subtle Ground Shadow */}
+                        <div className="relative flex min-h-0 flex-1 flex-col items-center justify-center">
+                          <div className={`aspect-square h-[106%] max-h-[162px] ${animClass}`}>
                             <Monster species={mon.species} stage={mon.displayStage} actualStage={mon.stage} mood={mood} equipped={view.equippedItems} />
                           </div>
+                          <div className="-mt-3 h-2.5 w-20 rounded-full bg-black/25 blur-[2px]" aria-hidden />
                         </div>
 
-                        <div className="relative mt-auto">
-                          <ScreenText className="mb-[2px] text-center text-[13px] opacity-95">
-                            O: FEED · ►: ARCADE · --: MENU · HOLD --: VOICE
-                          </ScreenText>
-                          <div className="snes-bar grid grid-cols-3 gap-x-2 gap-y-[3px] px-2 py-[5px]">
-                            <Pips label="Fullness" glyph="🍖" value={mon.fullness} cap={mon.statCap} />
-                            <Pips label="Happiness" glyph="♥️" value={mon.happiness} cap={mon.statCap} />
-                            <Pips label="Hygiene" glyph="🛁" value={mon.hygiene} cap={mon.statCap} />
-                            <Pips label="Energy" glyph="⚡" value={mon.energy} cap={mon.statCap} />
-                            <Pips label="Heat" glyph="🌶" value={mon.heat} cap={mon.heatCap} heat />
-                            <div className="flex items-center gap-[4px]">
-                              <span className="text-[11px]">💧</span>
-                              <span className="font-pixel snes-text text-[14px] leading-none text-[#ffd23f]">
-                                {mon.drip} · 🫃{view.belly.length}/{mon.memeSlots}
-                              </span>
-                            </div>
+                        {/* Sleek Frosted Bottom HUD + Clickable Quick-Action Dock */}
+                        <div
+                          className="relative mt-auto rounded-2xl border border-white/20 px-2.5 py-1.5 shadow-lg space-y-1.5"
+                          style={{ background: "rgba(14, 11, 34, 0.86)" }}
+                        >
+                          <div className="grid grid-cols-5 gap-2">
+                            <MiniStatBar glyph="🍖" value={mon.fullness} cap={mon.statCap} color="#34d399" />
+                            <MiniStatBar glyph="💛" value={mon.happiness} cap={mon.statCap} color="#f472b6" />
+                            <MiniStatBar glyph="🛁" value={mon.hygiene} cap={mon.statCap} color="#38bdf8" />
+                            <MiniStatBar glyph="⚡" value={mon.energy} cap={mon.statCap} color="#fde047" />
+                            <MiniStatBar glyph="🌶" value={mon.heat} cap={mon.heatCap} color="#fb923c" heat />
+                          </div>
+                          <div className="grid grid-cols-4 gap-1.5">
+                            {(
+                              [
+                                ["feed", "🖼️ Feed (O)"],
+                                ["care", "🧼 Care"],
+                                ["games", "🎮 Arcade"],
+                                ["menu", "☰ Menu"],
+                              ] as const
+                            ).map(([target, lbl]) => (
+                              <button
+                                key={target}
+                                type="button"
+                                onClick={() => {
+                                  blipNav();
+                                  setMode(target);
+                                }}
+                                className="rounded-lg bg-white/10 hover:bg-white/20 py-0.5 font-mono text-[9px] font-bold text-white/95 transition-colors"
+                              >
+                                {lbl}
+                              </button>
+                            ))}
                           </div>
                         </div>
                       </div>
@@ -1846,21 +2145,24 @@ export function App() {
 
                 {feedFx && view && mon && (
                   <div key={feedFx.id} className="pointer-events-none absolute inset-0 z-20" aria-hidden>
-                    <img src={feedFx.src} alt="" className="anim-feed-fly pixelated absolute left-[35%] top-[14%] h-[32%] w-[30%] border-2 border-[#0a0a24] object-cover" draggable={false} />
-                    <div className="absolute bottom-[2%] left-[28%] h-[52%] aspect-square">
+                    <img src={feedFx.src} alt="" className="anim-feed-fly absolute left-[35%] top-[14%] h-[32%] w-[30%] rounded-lg border-2 border-[#0a0a24] object-cover" draggable={false} />
+                    <div className="absolute bottom-[2%] left-[30%] h-[52%] aspect-square">
                       <Monster species={mon.species} stage={mon.displayStage} actualStage={mon.stage} mood="eating" equipped={view.equippedItems} />
                     </div>
                   </div>
                 )}
                 {burst && <Burst kind={burst.kind} burstKey={burst.id} />}
                 {screenMsg && mode !== "play_game" && (
-                  <div className="snes-window pointer-events-none absolute inset-x-2 bottom-2 z-20 px-2.5 py-1.5">
-                    <p className="font-pixel snes-text text-center text-[15px] leading-tight text-[#ffd23f]">{screenMsg}</p>
+                  <div
+                    className="pointer-events-none absolute inset-x-3 bottom-2.5 z-20 rounded-xl border border-[#fde047]/60 px-3 py-1.5 text-center shadow-xl"
+                    style={{ background: "rgba(12, 10, 32, 0.92)" }}
+                  >
+                    <p className="font-mono text-[10.5px] font-bold text-[#fde047]">{screenMsg}</p>
                   </div>
                 )}
                 {evoFlash && view && mon && (
                   <div className="anim-evo pointer-events-none absolute inset-0 z-20 flex flex-col items-center justify-center px-3 text-center" style={{ background: "radial-gradient(circle at 50% 42%, #fff7cc 0%, #ffd23f 55%, #ff9d2e 100%)" }}>
-                    <p className="font-game text-[15px] text-[#40260a]">★ EVOLVED! ★</p>
+                    <p className="font-game text-[14px] text-[#40260a]">★ EVOLVED! ★</p>
                     <div className="relative mt-1 h-[62%] aspect-square">
                       <div className="anim-evo-out absolute inset-0">
                         <Monster species={mon.species} stage={evoFlash.from} actualStage={evoFlash.from} mood="happy" equipped={[]} />
@@ -1869,7 +2171,7 @@ export function App() {
                         <Monster species={mon.species} stage={mon.stage} actualStage={mon.stage} mood="happy" equipped={view.equippedItems} />
                       </div>
                     </div>
-                    <p className="font-game mt-1 text-[13px] text-[#40260a]">{evoFlash.name.toUpperCase()}</p>
+                    <p className="font-game mt-1 text-[12px] text-[#40260a]">{evoFlash.name.toUpperCase()}</p>
                     <Burst kind="sparkles" burstKey={1} />
                   </div>
                 )}
@@ -1877,23 +2179,28 @@ export function App() {
               </div>
             </div>
 
-            {/* RIGHT WING: O (Confirm/Action), X (Back/Special), -- (Menu/Pause + Hold Voice PTT) */}
+            {/* RIGHT WING: Glossy Candy-Glass O (Confirm/Action), X (Back/Special), -- (Menu/Pause + Hold PTT) */}
             <div className="order-3 flex md:flex-col items-center justify-around md:justify-center gap-4">
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3.5">
                 <div className="flex flex-col items-center gap-1 mt-6">
                   <button
                     type="button"
                     aria-label="X Button: Back or Species Signature Special"
                     {...bindHw("x")}
-                    className={`h-13 w-13 rounded-full border-b-[5px] border-[#4c1d95] font-black text-lg shadow-lg flex items-center justify-center ${
-                      hwPressed.x
-                        ? "bg-[#f472b6] text-[#141026] translate-y-[2px]"
-                        : "bg-gradient-to-b from-[#c084fc] to-[#7c3aed] text-white"
-                    }`}
+                    style={{
+                      background: hwPressed.x
+                        ? "linear-gradient(180deg, #f9a8d4 0%, #ec4899 100%)"
+                        : "linear-gradient(180deg, #d8b4fe 0%, #9333ea 60%, #6b21a8 100%)",
+                      color: hwPressed.x ? "#141026" : "#ffffff",
+                      borderBottom: "5px solid #3b0764",
+                      boxShadow: "0 6px 14px rgba(107,33,168,0.45), inset 0 2px 3px rgba(255,255,255,0.42)",
+                      transform: hwPressed.x ? "translateY(2px)" : undefined,
+                    }}
+                    className="h-13 w-13 rounded-full font-black text-lg flex items-center justify-center"
                   >
                     X
                   </button>
-                  <span className="font-pixel text-[12px] text-[#c4b5fd]">BACK / SP</span>
+                  <span className="font-mono text-[10px] font-bold" style={{ color: shell.textMuted }}>BACK / SP</span>
                 </div>
 
                 <div className="flex flex-col items-center gap-1 -mt-6">
@@ -1901,15 +2208,20 @@ export function App() {
                     type="button"
                     aria-label="O Button: Confirm or Primary Action"
                     {...bindHw("o")}
-                    className={`h-14 w-14 rounded-full border-b-[5px] border-[#0f766e] font-black text-xl shadow-lg flex items-center justify-center ${
-                      hwPressed.o
-                        ? "bg-[#fde047] text-[#141026] translate-y-[2px]"
-                        : "bg-gradient-to-b from-[#7be6d8] to-[#14b8a6] text-[#141026]"
-                    }`}
+                    style={{
+                      background: hwPressed.o
+                        ? "linear-gradient(180deg, #fef08a 0%, #facc15 100%)"
+                        : "linear-gradient(180deg, #99f6e4 0%, #2dd4bf 58%, #0d9488 100%)",
+                      color: "#141026",
+                      borderBottom: "5px solid #115e59",
+                      boxShadow: "0 6px 16px rgba(20,184,166,0.45), inset 0 2px 3px rgba(255,255,255,0.5)",
+                      transform: hwPressed.o ? "translateY(2px)" : undefined,
+                    }}
+                    className="h-14 w-14 rounded-full font-black text-xl flex items-center justify-center"
                   >
                     O
                   </button>
-                  <span className="font-pixel text-[12px] text-[#7be6d8]">OK / ACT</span>
+                  <span className="font-mono text-[10px] font-bold" style={{ color: shell.textMuted }}>OK / ACT</span>
                 </div>
               </div>
 
@@ -1918,33 +2230,38 @@ export function App() {
                   type="button"
                   aria-label="Menu Pause Button (Hold for Push-to-Talk Voice)"
                   {...bindHw("menu")}
-                  className={`px-5 py-1.5 rounded-full border-b-[4px] border-[#111022] font-mono text-xs font-black tracking-widest shadow ${
-                    hwPressed.menu || pttActive
-                      ? "bg-[#fde047] text-[#141026] translate-y-[1px]"
-                      : "bg-[#383454] text-[#e5e1ff] hover:bg-[#464166]"
-                  }`}
+                  style={{
+                    background: hwPressed.menu || pttActive
+                      ? "linear-gradient(180deg, #fef08a 0%, #facc15 100%)"
+                      : shell.dpadBg,
+                    color: hwPressed.menu || pttActive ? "#141026" : shell.dpadText,
+                    borderBottom: "4px solid #100e1f",
+                    boxShadow: "inset 0 1px 0 rgba(255,255,255,0.22), 0 4px 10px rgba(0,0,0,0.35)",
+                    transform: hwPressed.menu ? "translateY(1px)" : undefined,
+                  }}
+                  className="px-5 py-1.5 rounded-full font-mono text-xs font-black tracking-widest"
                 >
                   --
                 </button>
-                <span className="font-pixel text-[12px] text-[#9a97a3]">MENU / HOLD:🎙️</span>
+                <span className="font-mono text-[9.5px] font-bold" style={{ color: shell.textMuted }}>MENU / HOLD:🎙️</span>
               </div>
             </div>
           </div>
 
-          <p className="mt-3 text-center text-[11px] text-[#8f8da3]">
-            Keyboard: <b>Arrows/WASD</b> D-Pad (<b>▲</b> Fullscreen in Feed) · <b>Z/Space/Enter</b> = O · <b>X/Backspace</b> = X · <b>Esc/P</b> = -- Menu
+          <p className="mt-3 text-center text-[11px] font-medium" style={{ color: shell.textMuted }}>
+            Keys: <b>Arrows/WASD</b> D-Pad (<b>▲</b> Fullscreen in Feed) · <b>Z/Space/Enter</b> O · <b>X/Backspace</b> X · <b>Esc/P</b> --
           </p>
         </div>
 
-        {/* Always-On Carry Hardware Wake Sensor Simulator (Light / Sound / Motion -> Meme Dream Screensaver) */}
+        {/* Always-On Carry Hardware Wake Sensor Strip (Light / Sound / Motion -> Meme Dream Screensaver) */}
         <section
           aria-label="Ambient Carry Wake Sensors"
-          className="mt-3 flex w-full max-w-[820px] flex-wrap items-center justify-between gap-2 rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-3.5 py-2.5 text-xs"
+          className="mt-3.5 flex w-full max-w-[880px] flex-wrap items-center justify-between gap-2 rounded-2xl border border-[var(--border)] bg-[var(--surface)]/90 px-4 py-2.5 text-xs shadow-lg"
         >
           <div className="min-w-0">
-            <span className="font-bold text-[#ffd23f]">💭 Sleep Meme Dream Saver</span>
+            <span className="font-bold text-[#fde047]">💭 Sleep Meme Dream Saver</span>
             <span className="ml-2 text-[var(--dim)]">
-              Auto-wakes display on Light, Sound, or Motion ({view?.dreamMemes.length ?? 0} fed memes in dream reel)
+              Carry wake triggers ({view?.dreamMemes.length ?? 0} fed memes in dream reel)
             </span>
           </div>
           <div className="flex flex-wrap items-center gap-1.5">
@@ -1964,24 +2281,21 @@ export function App() {
             <button
               type="button"
               onClick={() => triggerAmbientSensor("light")}
-              className="rounded-full border border-amber-400/40 bg-amber-400/15 px-2.5 py-1 text-[11px] font-bold text-amber-200 hover:bg-amber-400/25"
-              title="Simulate Ambient Light Sensor wake into Meme Dream Screensaver"
+              className="rounded-full border border-amber-400/40 bg-amber-400/15 px-3 py-1 text-[11px] font-bold text-amber-200 hover:bg-amber-400/25"
             >
               ☀️ Light
             </button>
             <button
               type="button"
               onClick={() => triggerAmbientSensor("sound")}
-              className="rounded-full border border-teal-400/40 bg-teal-400/15 px-2.5 py-1 text-[11px] font-bold text-teal-200 hover:bg-teal-400/25"
-              title="Simulate I2S Mic Sound wake into Meme Dream Screensaver"
+              className="rounded-full border border-teal-400/40 bg-teal-400/15 px-3 py-1 text-[11px] font-bold text-teal-200 hover:bg-teal-400/25"
             >
               🎙️ Sound
             </button>
             <button
               type="button"
               onClick={() => triggerAmbientSensor("motion")}
-              className="rounded-full border border-violet-400/40 bg-violet-400/15 px-2.5 py-1 text-[11px] font-bold text-violet-200 hover:bg-violet-400/25"
-              title="Simulate IMU Motion/Pickup wake into Meme Dream Screensaver"
+              className="rounded-full border border-violet-400/40 bg-violet-400/15 px-3 py-1 text-[11px] font-bold text-violet-200 hover:bg-violet-400/25"
             >
               📳 Motion
             </button>
@@ -1989,7 +2303,7 @@ export function App() {
         </section>
 
         {/* Voice / URL Dock */}
-        <form onSubmit={onTalk} className="mt-4 flex w-full max-w-[820px] gap-2">
+        <form onSubmit={onTalk} className="mt-3 flex w-full max-w-[880px] gap-2">
           <input
             ref={talkInputRef}
             value={talkText}
@@ -1999,32 +2313,32 @@ export function App() {
                 ? "Paste an image URL (https://…) to post to feed, or talk to your pet…"
                 : "🎙️ Hold -- or type here to talk (try 'feed', 'stonks', 'doge', 'sus')…"
             }
-            className="flex-1 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3.5 py-2 text-sm text-[var(--text)] outline-none focus:border-[#7be6d8]"
+            className="flex-1 rounded-2xl border border-[var(--border)] bg-[var(--surface)]/90 px-4 py-2.5 text-sm text-[var(--text)] outline-none focus:border-[#7be6d8]"
           />
           <button
             type="submit"
             disabled={!talkText.trim() || talkMut.isPending || urlMut.isPending}
-            className="rounded-xl bg-[#ffd23f] px-4 py-2 text-sm font-bold text-[#141026] disabled:opacity-40"
+            className="rounded-2xl bg-gradient-to-r from-[#7be6d8] to-[#fde047] px-5 py-2.5 text-sm font-extrabold text-[#141026] disabled:opacity-40"
           >
             {mode === "post" && URL_RE.test(talkText.trim()) ? "Post URL" : "Speak"}
           </button>
         </form>
 
         {notice && (
-          <p className="mt-2 w-full max-w-[820px] rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3.5 py-2 text-xs text-[#7be6d8]">
+          <p className="mt-2 w-full max-w-[880px] rounded-2xl border border-[#7be6d8]/35 bg-[var(--surface)]/90 px-4 py-2 text-xs font-medium text-[#7be6d8]">
             {notice}
           </p>
         )}
 
-        <details className="mt-3 w-full max-w-[820px] rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3.5 py-2 text-xs text-[var(--dim)]">
+        <details className="mt-3 w-full max-w-[880px] rounded-2xl border border-[var(--border)] bg-[var(--surface)]/80 px-4 py-2.5 text-xs text-[var(--dim)]">
           <summary className="cursor-pointer font-semibold text-[var(--text)]">
-            Hardware Spec &amp; Secret Voice Words ({view?.secrets.length ?? 0}/10 unlocked)
+            Hardware Spec (320×240 IPS) &amp; Secret Voice Words ({view?.secrets.length ?? 0}/10 unlocked)
           </summary>
           <p className="mt-2 leading-relaxed">
-            Display: <b>1.69" ST7789V2 IPS TFT</b> (240×280 native, rotated <b>280×240 landscape</b>, 262K color, SPI, rounded glass corners) · MCU: <b>ESP32-S3-WROOM-1</b> · Controls: <b>4-way D-Pad + O + X + -- (Hold for I2S Mic PTT)</b> · Carry Wake Sensors: <b>Light (ALS/LDR) + Sound (INMP441 Mic) + Motion (LIS3DH/IMU)</b> wake directly into the Meme Dream Screensaver.
+            Display: <b>2.0" ST7789VW / 2.4" ILI9341 IPS TFT</b> (240×320 native, rotated <b>320×240 4:3 landscape</b>, 262K color, 4-wire SPI) · MCU: <b>ESP32-S3-N16R8</b> · Controls: <b>4-way D-Pad + O + X + -- (Hold for I2S Mic PTT)</b> · Carry Wake Sensors: <b>Light (BH1750/LDR) + Sound (INMP441 Mic) + Motion (LIS3DH/QMI8658 IMU)</b> wake directly into the Meme Dream Screensaver.
           </p>
           <p className="mt-1.5">
-            Secret words to try: <span className="font-mono text-[#ffd23f]">{SECRET_HINTS.join(" · ")}</span>
+            Secret words to try: <span className="font-mono text-[#fde047]">{SECRET_HINTS.join(" · ")}</span>
           </p>
         </details>
       </main>

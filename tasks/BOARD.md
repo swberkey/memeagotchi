@@ -1,6 +1,6 @@
 # MemeAgotchi — Sprint Board & Multi-AI Handoffs
 
-## Current Phase: Sprint 3 Complete (280×240 Hardware Alignment + Title/5 Starters + 3 SNES Games + Full Progression) → Ready for Sprint 4 (Grok Dialogue Pack / Cloud Deployment / ESP32-S3 Firmware)
+## Current Phase: 320×240 (4:3 QVGA) Alignment & Stylistic UI Redesign Complete → Ready for Cloud Deployment / Grok Dialogue Pack / ESP32-S3 Hardware Build
 
 ### Sprint 1 — Unified Core & Bug-Free Runtime (Completed · `7594ce9`)
 - [x] Initialize clean Git monorepo + `AGENTS.md` / `CLAUDE.md` / contracts / ADRs
@@ -24,10 +24,17 @@
 - [x] **Verification & Visual QA:** Verified `npm run check` (7/7 workspaces typecheck & build, 18/18 tests) and live browser QA on `http://localhost:3000/` and `http://localhost:3000/handheld/`; fixed Tailwind v4 shared-package scanning (`@source`) for `ArcadeGamepad`, canvas result wrapping, and single-line keyboard hints.
 - [x] **Full-Screen Meme Feed (`▲` Up Arrow) & Always-On Meme Dream Screensaver:** Added `dreamMemes` engine projection (19/19 tests), 1/8-size gliding `<PixelSleepingSprite />` + `<DreamScreensaver />` over the monster's fed memes, `▲` Up Arrow full-screen meme viewing in both Handheld `280×240` and Web Companion, and Light / Sound / Motion ambient carry wake sensor simulation + BOM updates in `docs/handheld-architecture.md` & `hardware/README.md`.
 
+### Sprint 3.5 — `320×240` (4:3 QVGA) Standardization & Stylistic UI Redesign (Completed)
+- [x] **Display Standard Updated (`320×240` 4:3 QVGA):** Recorded [ADR-003](../docs/decisions/ADR-003-display-320x240-qvga-ui-redesign.md) targeting **2.0" ST7789VW** (and drop-in **2.4" ST7789/ILI9341**) 262K color SPI IPS modules (`153.6 KB` / `307.2 KB` double-buffered RAM). Updated `docs/handheld-architecture.md`, `docs/GDD-v1.0.md` (v1.2 Addendum), `hardware/README.md`, `docs/contracts/`, `AGENTS.md`, `README.md`, and `packages/game-core` copy.
+- [x] **Native `320×240` (4:3) SNES Arcade:** Reflowed `SCREEN_W = 320`, `aspect-[4/3]`, HUD bar, Meme Runner DX runway, Troll Blaster arena, and Vibe Beat concert stage & 5-lane rhythm highway (`LANE_W = 35`), plus boutique candy-glass `<ArcadeGamepad />`.
+- [x] **Stylistic & User-Friendly UI Redesign:**
+  - **Handheld Simulator (`apps/handheld-sim`):** 4 live switchable hardware shell colorways (`Obsidian`, `Atomic Purple`, `Mint Cream`, `Retro SNES`), flush 4:3 glass lens, recessed D-Pad well, direct mouse/touch clickability across all screens (5×2 visual app launcher grid, Pet bottom quick-action dock, clickable vibe pills & stat tabs), `▲` Full-Screen `320×240` Meme Feed, and Sleep Meme Dream Screensaver + Light/Sound/Motion wake sensors.
+  - **Web Companion (`apps/web-companion`):** `Plus Jakarta Sans` + `Silkscreen` typography, species-tinted habitat card, 4:3 Sleep Dream Screensaver, floating glass pill bottom nav with Belly badge, unified 3-tab lower drawer (`Pulse` / `Secrets` / `Pet Options`), dark-glass harmonized Feed cards, and `320×240` 4:3 SNES Arcade.
+
 ### Sprint 4 — Next Up (Content Polish, Cloud Deployment & Hardware Build)
 - [ ] Grok session (GDD §5.3 Prompt 0.2): finalize 5 reserve secret words & expand all 5 starter species' Muse voice dialogue packs
 - [ ] Cloud deployment: deploy via `Dockerfile` (Railway/Render/Fly.io) or add Supabase Auth + Postgres + Storage adapter (GDD §8) + Capacitor Android wrap
-- [ ] Hardware Phase 1 breadboard: wire ESP32-S3-WROOM-1 + 1.69" ST7789V2 SPI display + 7 tactile switches (D-Pad + `O`/`X`/`--`) + INMP441/MAX98357A audio and port `packages/game-core` to C/C++ verified against golden unit-test vectors
+- [ ] Hardware Phase 1 breadboard: wire ESP32-S3-N16R8 (or Waveshare ESP32-S3 2" LCD Board) + 2.0" ST7789VW `320×240` SPI display + 7 tactile switches (D-Pad + `O`/`X`/`--`) + INMP441/MAX98357A audio + LIS3DH/BH1750 carry wake sensors and port `packages/game-core` to C/C++ verified against golden unit-test vectors
 
 ---
 

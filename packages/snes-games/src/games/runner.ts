@@ -95,8 +95,8 @@ export function createRunnerEngine(cfg: SnesGameConfig): SnesEngineInstance {
   let susWarningTimer = 0;
 
   const platforms: Platform[] = [
-    { x: 165, y: 152, w: 66 },
-    { x: 265, y: 122, w: 58 },
+    { x: 185, y: 152, w: 68 },
+    { x: 295, y: 122, w: 62 },
   ];
   const enemies: RunnerEnemy[] = [];
   const pickups: Pickup[] = [];
@@ -149,7 +149,7 @@ export function createRunnerEngine(cfg: SnesGameConfig): SnesEngineInstance {
     } else if (specialId === "glitch-blink") {
       glitchBlinkTimer = 0.65;
       invulnTimer = Math.max(invulnTimer, 0.9);
-      px = Math.min(182, px + 46);
+      px = Math.min(220, px + 50);
       vy = Math.min(vy, -90);
       for (let i = enemies.length - 1; i >= 0; i--) {
         const e = enemies[i]!;
@@ -236,11 +236,11 @@ export function createRunnerEngine(cfg: SnesGameConfig): SnesEngineInstance {
       phantomPhaseTimer = Math.max(0, phantomPhaseTimer - dt);
       susWarningTimer = Math.max(0, susWarningTimer - dt);
 
-      // Horizontal movement
-      const moveSpeed = cfg.buffs.dogeSpeed ? 142 : 118;
+      // Horizontal movement across 320px runway
+      const moveSpeed = cfg.buffs.dogeSpeed ? 148 : 124;
       if (pressed.left) px -= moveSpeed * dt;
       if (pressed.right) px += moveSpeed * dt;
-      px = Math.max(22, Math.min(185, px));
+      px = Math.max(22, Math.min(220, px));
       ducking = pressed.down && onGround;
 
       // Vertical physics + one-way platforms

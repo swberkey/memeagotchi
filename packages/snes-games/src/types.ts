@@ -1,6 +1,6 @@
 import type { MilestonePowers, MiniGameId, SpeciesId } from "@memeagotchi/game-core";
 
-export const SCREEN_W = 280;
+export const SCREEN_W = 320;
 export const SCREEN_H = 240;
 
 export type GamepadButton = "up" | "down" | "left" | "right" | "o" | "x" | "menu";

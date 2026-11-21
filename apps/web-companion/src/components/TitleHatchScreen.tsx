@@ -51,8 +51,8 @@ export function TitleHatchScreen({
       <div className="w-full max-w-2xl space-y-5">
         {/* Title Hero Header */}
         <header className="text-center space-y-2">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[var(--surface2)] border border-[var(--border)] text-[11px] font-bold text-[var(--accent)]">
-            <span>📟 1.69" 280×240 IPS EDITION</span>
+          <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-[var(--surface2)] border border-[var(--border)] text-[11px] font-bold text-[var(--accent)] shadow">
+            <span>📟 320×240 (4:3) IPS EDITION</span>
             <span>·</span>
             <span>5 PLAYABLE STARTERS</span>
           </div>
@@ -60,7 +60,7 @@ export function TitleHatchScreen({
             MEMEAGOTCHI
           </h1>
           <p className="text-sm text-[var(--dim)] max-w-md mx-auto">
-            Raise a meme-powered pocket monster across the Web Companion and the 280×240 ESP32-S3 Handheld.
+            Raise a meme-powered pocket monster across the Web Companion and the 320×240 ESP32-S3 Handheld.
           </p>
         </header>
 
@@ -124,7 +124,7 @@ export function TitleHatchScreen({
                 rel="noreferrer"
                 className="py-3 px-4 rounded-2xl bg-[#ffd23f] text-[#141026] font-bold text-sm text-center hover:brightness-105"
               >
-                📟 Launch 280×240 Handheld ↗
+                📟 Launch 320×240 Handheld ↗
               </a>
             </div>
 
@@ -320,7 +320,7 @@ export function TitleHatchScreen({
                 rel="noreferrer"
                 className="text-[#ffd23f] font-bold hover:underline"
               >
-                📟 Switch to 280×240 Handheld Sim ↗
+                📟 Switch to 320×240 Handheld Sim ↗
               </a>
             </div>
           </section>

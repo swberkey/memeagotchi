@@ -15,8 +15,8 @@ const LANE_BUTTONS: readonly GamepadButton[] = ["left", "down", "up", "right", "
 const LANE_GLYPHS = ["◄", "▼", "▲", "►", "O"];
 const LANE_COLORS = ["#38bdf8", "#a855f7", "#4ade80", "#f472b6", "#fde047"];
 
-const HIGHWAY_X = 114;
-const LANE_W = 31;
+const HIGHWAY_X = 138;
+const LANE_W = 35;
 const HIT_Y = 204;
 const SONG_DURATION_SEC = 42;
 const BEAT_INTERVAL = 60 / 116; // ~0.517s per beat (116 BPM)
@@ -254,35 +254,35 @@ export function createBeatEngine(cfg: SnesGameConfig): SnesEngineInstance {
       ctx.fillStyle = bg;
       ctx.fillRect(0, 0, SCREEN_W, SCREEN_H);
 
-      // Left concert stage panel (0..108)
+      // Left concert stage panel (0..132 on 320x240)
       const beatPulse = Math.abs(Math.sin((timeSec / BEAT_INTERVAL) * Math.PI));
-      ctx.fillStyle = `rgba(123, 230, 216, ${0.08 + beatPulse * 0.08})`;
+      ctx.fillStyle = `rgba(123, 230, 216, ${0.09 + beatPulse * 0.09})`;
       ctx.beginPath();
-      ctx.moveTo(54, 24);
-      ctx.lineTo(10, 215);
-      ctx.lineTo(98, 215);
+      ctx.moveTo(67, 24);
+      ctx.lineTo(12, 215);
+      ctx.lineTo(122, 215);
       ctx.closePath();
       ctx.fill();
 
       // Equalizer bars behind dancing monster
-      for (let i = 0; i < 6; i++) {
-        const h = 14 + Math.abs(Math.sin(timeSec * 5 + i * 1.1)) * (26 + Math.min(20, combo * 2));
+      for (let i = 0; i < 7; i++) {
+        const h = 14 + Math.abs(Math.sin(timeSec * 5 + i * 1.1)) * (28 + Math.min(20, combo * 2));
         ctx.fillStyle = i % 2 === 0 ? sp.accentColor : sp.secondaryColor;
-        ctx.globalAlpha = 0.35;
-        ctx.fillRect(10 + i * 15, 194 - h, 11, h);
+        ctx.globalAlpha = 0.38;
+        ctx.fillRect(10 + i * 17, 194 - h, 12, h);
       }
       ctx.globalAlpha = 1;
 
       // Stage floor
       ctx.fillStyle = "#3f2e82";
-      ctx.fillRect(4, 194, 102, 40);
+      ctx.fillRect(4, 194, 128, 40);
       ctx.fillStyle = "#fde047";
-      ctx.fillRect(4, 194, 102, 2);
+      ctx.fillRect(4, 194, 128, 2);
 
       // Dancing species hero!
       const hopY = danceTimer > 0 ? -Math.sin((danceTimer / 0.28) * Math.PI) * 14 : -beatPulse * 4;
-      const swayX = danceTimer > 0 ? (dancePose % 2 === 0 ? -5 : 5) : 0;
-      drawSpeciesHero(ctx, 55 + swayX, 160 + hopY, 21, {
+      const swayX = danceTimer > 0 ? (dancePose % 2 === 0 ? -6 : 6) : 0;
+      drawSpeciesHero(ctx, 68 + swayX, 158 + hopY, 23, {
         species: cfg.species,
         stage: cfg.stage,
         equippedIds: cfg.equippedIds,
@@ -299,26 +299,26 @@ export function createBeatEngine(cfg: SnesGameConfig): SnesEngineInstance {
 
       // Judgment popup on stage
       if (popup) {
-        ctx.font = "bold 10px monospace";
+        ctx.font = "bold 11px monospace";
         ctx.textAlign = "center";
         ctx.fillStyle = "#0a0a24";
-        ctx.fillText(popup.text, 56, 86);
+        ctx.fillText(popup.text, 69, 86);
         ctx.fillStyle = popup.color;
-        ctx.fillText(popup.text, 55, 85);
+        ctx.fillText(popup.text, 68, 85);
         ctx.textAlign = "left";
       }
 
       // Fever multiplier pill on stage
       if (combo >= 5) {
         ctx.fillStyle = "#f472b6";
-        ctx.fillRect(16, 42, 78, 15);
+        ctx.fillRect(24, 42, 88, 16);
         ctx.strokeStyle = "#0a0a24";
         ctx.lineWidth = 1.5;
-        ctx.strokeRect(16, 42, 78, 15);
+        ctx.strokeRect(24, 42, 88, 16);
         ctx.fillStyle = "#ffffff";
-        ctx.font = "bold 8.5px monospace";
+        ctx.font = "bold 9px monospace";
         ctx.textAlign = "center";
-        ctx.fillText(`FEVER ×${combo}`, 55, 52);
+        ctx.fillText(`FEVER ×${combo}`, 68, 53);
         ctx.textAlign = "left";
       }
 

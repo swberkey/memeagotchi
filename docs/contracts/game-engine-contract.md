@@ -1,6 +1,6 @@
 # Game Engine Contract (`packages/game-core`)
 
-This contract specifies the deterministic state machine shared across the Web Companion, the **280×240 Landscape Handheld Simulator**, and the future ESP32-S3 C/C++ firmware port.
+This contract specifies the deterministic state machine shared across the Web Companion, the **320×240 (4:3) Landscape Handheld Simulator**, and the future ESP32-S3 C/C++ firmware port.
 
 ## 1. Time & Clock Model
 - Every engine function takes an explicit UTC epoch millisecond timestamp `nowMs: number`.

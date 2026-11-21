@@ -46,26 +46,26 @@ export function drawPixelHudBar(
     ctx.fillRect(sx + 2, 7, 3, 3);
   }
 
-  // Score + Combo center-left
-  ctx.font = "bold 9px monospace";
+  // Score + Combo center-left (reflowed cleanly for 320px wide 4:3 screen)
+  ctx.font = "bold 9.5px monospace";
   ctx.textBaseline = "top";
   ctx.textAlign = "center";
   ctx.fillStyle = "#ffffff";
-  ctx.fillText(`SCR ${opts.score}`, 118, 4);
+  ctx.fillText(`SCR ${opts.score}`, 138, 4);
   if (opts.combo >= 2) {
     ctx.fillStyle = "#fde047";
-    ctx.fillText(`×${opts.combo} COMBO`, 118, 13);
+    ctx.fillText(`×${opts.combo} COMBO`, 138, 13);
   } else if (opts.milestonePowers.memeOverdrive) {
     ctx.fillStyle = "#f472b6";
-    ctx.fillText("OVERDRIVE ×1.5", 118, 13);
+    ctx.fillText("OVERDRIVE ×1.5", 138, 13);
   } else if (opts.extraTag) {
     ctx.fillStyle = "#7be6d8";
-    ctx.fillText(opts.extraTag, 118, 13);
+    ctx.fillText(opts.extraTag, 138, 13);
   }
 
   // Special X meter (right side)
-  const barX = 178;
-  const barW = 54;
+  const barX = 204;
+  const barW = 66;
   ctx.fillStyle = "rgba(255,255,255,0.14)";
   ctx.fillRect(barX, 13, barW, 6);
   ctx.fillStyle = opts.specialActive

@@ -1,6 +1,6 @@
 # Companion ↔ Device Sync Contract
 
-Both the **Web Companion** (`/`) and the **Landscape 280×240 Handheld Simulator** (`/handheld/`) communicate with `apps/server` through `/api/actions` (typed JSON-RPC POST `{ action, args }`) and `/api/upload` (≤ 5 MB magic-byte-validated image upload).
+Both the **Web Companion** (`/`) and the **Landscape 320×240 (4:3) Handheld Simulator** (`/handheld/`) communicate with `apps/server` through `/api/actions` (typed JSON-RPC POST `{ action, args }`) and `/api/upload` (≤ 5 MB magic-byte-validated image upload).
 
 ## Shared Actions Surface
 | Action | Used By | Purpose |

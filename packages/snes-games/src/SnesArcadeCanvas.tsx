@@ -202,10 +202,10 @@ export function SnesArcadeCanvas({
           ctx.fillStyle = "rgba(10, 10, 36, 0.78)";
           ctx.fillRect(0, 0, SCREEN_W, SCREEN_H);
           ctx.fillStyle = "#23237a";
-          ctx.fillRect(46, 74, 188, 92);
+          ctx.fillRect(SCREEN_W / 2 - 96, 74, 192, 92);
           ctx.strokeStyle = "#fde047";
           ctx.lineWidth = 2.5;
-          ctx.strokeRect(46, 74, 188, 92);
+          ctx.strokeRect(SCREEN_W / 2 - 96, 74, 192, 92);
           ctx.textAlign = "center";
           ctx.fillStyle = "#fde047";
           ctx.font = "bold 14px monospace";
@@ -243,8 +243,8 @@ export function SnesArcadeCanvas({
       width={SCREEN_W}
       height={SCREEN_H}
       onClick={handleCanvasClick}
-      aria-label={`SNES ${game} 280 by 240 canvas`}
-      className={`block w-full aspect-[7/6] bg-[#0a0a24] select-none cursor-pointer ${className}`}
+      aria-label={`SNES ${game} 320 by 240 canvas`}
+      className={`block w-full aspect-[4/3] bg-[#0a0a24] select-none cursor-pointer ${className}`}
       style={{ imageRendering: "auto" }}
     />
   );
@@ -412,7 +412,7 @@ function renderResultsScreen(
   }
 
   if (p.resultBanner) {
-    // Strip leading emoji/prefix for crisp 280px pixel canvas readability and wrap cleanly across up to 2 lines
+    // Strip leading emoji/prefix for crisp 320px pixel canvas readability and wrap cleanly across up to 2 lines
     const clean = p.resultBanner
       .replace(/^[^\w+]+/, "")
       .replace(/complete!\s*Score\s*\d+:\s*/i, "")
@@ -422,7 +422,7 @@ function renderResultsScreen(
     let cur = "";
     for (const w of words) {
       const candidate = cur ? `${cur} ${w}` : w;
-      if (candidate.length <= 36) {
+      if (candidate.length <= 42) {
         cur = candidate;
       } else {
         if (cur) lines.push(cur);
@@ -432,9 +432,9 @@ function renderResultsScreen(
     }
     if (cur && lines.length < 2) lines.push(cur);
     ctx.fillStyle = "#7be6d8";
-    ctx.font = "bold 7.5px monospace";
+    ctx.font = "bold 8px monospace";
     lines.forEach((ln, idx) => {
-      const clipped = ln.length > 38 ? `${ln.slice(0, 37)}…` : ln;
+      const clipped = ln.length > 44 ? `${ln.slice(0, 43)}…` : ln;
       ctx.fillText(clipped, SCREEN_W / 2, 195 + idx * 10);
     });
   }
